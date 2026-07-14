@@ -3,11 +3,16 @@ Debug/
 settings/
 
 # === IAR User-specific Files ===
-*.ewt          # Editor layout/tabs (user preference)
-*.crun         # C-RUN runtime analysis
-*.dbgdt        # Debug desktop layout
-*.dnx          # Debugger Nexus XML
-*.wsdt         # Workspace desktop layout
+# Editor layout/tabs (user preference)
+*.ewt
+# C-RUN runtime analysis
+*.crun
+# Debug desktop layout
+*.dbgdt
+# Debugger Nexus XML
+*.dnx
+# Workspace desktop layout
+*.wsdt
 
 # === Build Artifacts (generated) ===
 *.o
