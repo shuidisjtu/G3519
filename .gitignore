@@ -1,0 +1,43 @@
+# === IAR EWARM Build Outputs ===
+Debug/
+settings/
+
+# === IAR User-specific Files ===
+*.ewt          # Editor layout/tabs (user preference)
+*.crun         # C-RUN runtime analysis
+*.dbgdt        # Debug desktop layout
+*.dnx          # Debugger Nexus XML
+*.wsdt         # Workspace desktop layout
+
+# === Build Artifacts (generated) ===
+*.o
+*.out
+*.sim
+*.map
+*.bin
+*.hex
+*.elf
+*.axf
+
+# === Browse Info (generated) ===
+*.pbi
+*.pbd
+*.pbw
+*.xcl
+*.dep
+
+# === Ninja Build Cache ===
+.ninja_*
+build.ninja
+
+# === OS Files ===
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# === Editor / IDE ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
