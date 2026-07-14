@@ -14,8 +14,6 @@ MSPM0G3519 嵌入式开发项目。主控芯片为 TI `MSPM0G3519SPZR`（100 引
 - **DAPLink 接线**: 必须连接 SWDIO(J1-7)、SWCLK(J1-5)、GND(J1-6/8/9)、VTref(J1-10)，建议连接 RST(J1-1)
 - DAPLink VTref 接 `MCU_3V3`，不接 DAPLink 的 3.3V 电源输出
 
-详见 `MSPM0G3519_IAR_DAPLink_开发板验证操作手册.md`。
-
 ## 开发工具链
 
 | 工具 | 安装路径 | 版本 | 用途 |
@@ -86,6 +84,5 @@ DL_GPIO_togglePins(GPIOB, DL_GPIO_PIN_5);   // 4. 翻转
 
 ## 参考文档
 
-- `MSPM0G3519_IAR_DAPLink_开发板验证操作手册.md` — 完整验证流程与故障排查
 - TI MSPM0 SDK: `C:\ti\mspm0_sdk_2_10_00_04`
 - IAR EWARM: `D:\iar\ewarm-9.60.3`
