@@ -16,25 +16,42 @@
 static const char       *g_title;
 static tsp_menu_item_t  *g_items;
 static uint8_t           g_count;
-static uint8_t           g_cursor;        /* currently selected index */
-static uint8_t           g_redraw;        /* 1 = full redraw needed */
+static uint8_t           g_cursor;
+static uint8_t           g_cursor_prev;
+static uint8_t           g_needs_full;     /* 1 = full redraw (init/switch) */
+
+/* Draw a single menu row in selected or normal style */
+static void menu_draw_row(uint8_t idx)
+{
+    uint8_t row = MENU_ITEMS_START + idx;
+
+    if (idx == g_cursor) {
+        tsp_tft18_show_str_color(0, row, (uint8_t *)g_items[idx].text,
+                                 MENU_SEL_FG_COLOR, MENU_SEL_BG_COLOR);
+    } else {
+        tsp_tft18_show_str_color(0, row, (uint8_t *)g_items[idx].text,
+                                 MENU_FG_COLOR, MENU_BG_COLOR);
+    }
+}
 
 void tsp_menu_init(const char *title, tsp_menu_item_t *items, uint8_t count)
 {
-    g_title  = title;
-    g_items  = items;
-    g_count  = count;
-    g_cursor = 0;
-    g_redraw = 1;
+    g_title        = title;
+    g_items        = items;
+    g_count        = count;
+    g_cursor       = 0;
+    g_cursor_prev  = 0;
+    g_needs_full   = 1;
 }
 
 void tsp_menu_switch(const char *title, tsp_menu_item_t *items, uint8_t count)
 {
-    g_title  = title;
-    g_items  = items;
-    g_count  = count;
-    g_cursor = 0;
-    g_redraw = 1;
+    g_title        = title;
+    g_items        = items;
+    g_count        = count;
+    g_cursor       = 0;
+    g_cursor_prev  = 0;
+    g_needs_full   = 1;
 }
 
 /*
@@ -44,7 +61,6 @@ void tsp_menu_switch(const char *title, tsp_menu_item_t *items, uint8_t count)
 uint8_t tsp_menu_run(void)
 {
     uint8_t i;
-    uint8_t row;
     uint8_t back = 0;
 
     /* Back/Exit: PUSH */
@@ -53,22 +69,22 @@ uint8_t tsp_menu_run(void)
     }
 
     /* Handle key navigation */
+    g_cursor_prev = g_cursor;
+
     if (tsp_key_pressed(KEY_S0)) {
         if (g_cursor > 0) {
             g_cursor--;
         } else {
-            g_cursor = g_count - 1;  /* wrap to bottom */
+            g_cursor = g_count - 1;
         }
-        g_redraw = 1;
     }
 
     if (tsp_key_pressed(KEY_S1)) {
         if (g_cursor < g_count - 1) {
             g_cursor++;
         } else {
-            g_cursor = 0;  /* wrap to top */
+            g_cursor = 0;
         }
-        g_redraw = 1;
     }
 
     /* Confirm: S2 */
@@ -78,35 +94,24 @@ uint8_t tsp_menu_run(void)
         }
     }
 
-    if (!g_redraw) return back;
-    g_redraw = 0;
+    /* Full redraw on init/switch */
+    if (g_needs_full) {
+        g_needs_full = 0;
 
-    /* Clear menu area and redraw title */
-    tsp_tft18_show_str_color(0, MENU_TITLE_ROW, (uint8_t *)g_title, BLUE, YELLOW);
+        tsp_tft18_show_str_color(0, MENU_TITLE_ROW,
+                                 (uint8_t *)g_title, BLUE, YELLOW);
+        tsp_tft18_draw_line_h(0, (MENU_TITLE_ROW + 1) * 16, 160, BLUE);
 
-    /* Draw separator line under title */
-    tsp_tft18_draw_line_h(0, (MENU_TITLE_ROW + 1) * 16, 160, BLUE);
-
-    /* Clear old items */
-    for (i = 0; i < MENU_ITEMS_MAX; i++) {
-        row = MENU_ITEMS_START + i;
-        tsp_tft18_show_str_color(0, row, (uint8_t *)"                    ",
-                                 WHITE, BLACK);
+        for (i = 0; i < g_count && i < MENU_ITEMS_MAX; i++) {
+            menu_draw_row(i);
+        }
+        return back;
     }
 
-    /* Draw menu items */
-    for (i = 0; i < g_count && i < MENU_ITEMS_MAX; i++) {
-        row = MENU_ITEMS_START + i;
-
-        if (i == g_cursor) {
-            /* Selected: inverted colors */
-            tsp_tft18_show_str_color(0, row, (uint8_t *)g_items[i].text,
-                                     MENU_SEL_FG_COLOR, MENU_SEL_BG_COLOR);
-        } else {
-            /* Normal */
-            tsp_tft18_show_str_color(0, row, (uint8_t *)g_items[i].text,
-                                     MENU_FG_COLOR, MENU_BG_COLOR);
-        }
+    /* Incremental update: only redraw rows whose selection state changed */
+    if (g_cursor != g_cursor_prev) {
+        menu_draw_row(g_cursor_prev);  /* old cursor -> unselected */
+        menu_draw_row(g_cursor);       /* new cursor -> selected   */
     }
 
     return back;

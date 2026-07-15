@@ -48,10 +48,24 @@ static void action_buzzer(void)
 static void action_counter(void)
 {
 	static uint32_t cnt = 0;
+	uint8_t blank[] = "                    ";
+
 	cnt++;
 
 	tsp_tft18_show_str_color(0, 7, (uint8_t *)"Count:", YELLOW, BLACK);
 	tsp_tft18_show_uint16(48, 7, (uint16_t)cnt);
+	tsp_tft18_show_str_color(0, 6, (uint8_t *)"PUSH to return...",
+	                         CYAN, BLACK);
+
+	/* Wait for PUSH to dismiss */
+	while (1) {
+		tsp_key_scan();
+		if (tsp_key_pressed(KEY_PUSH)) break;
+		delay_1ms(10);
+	}
+
+	tsp_tft18_show_str_color(0, 6, blank, WHITE, BLACK);
+	tsp_tft18_show_str_color(0, 7, blank, WHITE, BLACK);
 }
 
 static void action_about(void)
