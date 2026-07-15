@@ -8,5 +8,6 @@
   <files>
 		<path>$PROJ_DIR$\ti_msp_dl_config.c</path>
 		<path>$PROJ_DIR$\ti_msp_dl_config.h</path>
+		<path>$PROJ_DIR$\Event.dot</path>
   </files>
 </iarProjectConnection>

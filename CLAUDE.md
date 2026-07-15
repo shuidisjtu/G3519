@@ -38,22 +38,30 @@ MSPM0G3519 嵌入式开发项目。主控芯片为 TI `MSPM0G3519SPZR`（100 引
 
 ### 工作工程
 
-实际开发工作在 `empty_mspm0g3519/` 目录，基于 SDK 示例复制并适配：
+实际开发工作在 `empty_mspm0g3519/` 目录，参照老师例程 (`F:\Test\Example\TSP3519\`) 组织：
 
 ```
-empty_mspm0g3519/                    ← $PROJ_DIR$（工程根目录）
-├── empty_mspm0g3519_nortos_iar.eww  ← IAR 工作区（从此打开）
-├── empty_mspm0g3519_nortos_iar.ewp  ← IAR 工程文件
-├── empty_mspm0g3519_nortos_iar.ipcf ← IAR Project Connection（SysConfig 构建规则）
-├── empty_mspm0g3519.c               ← 主程序（LED 闪烁）
-├── empty_mspm0g3519.syscfg          ← SysConfig 配置
-├── mspm0g3519.icf                   ← 链接脚本
-├── ti_msp_dl_config.c / .h          ← SysConfig 生成（不要手动编辑）
-└── iar/
-    └── startup_mspm0g351x_iar.c     ← 启动文件
+empty_mspm0g3519/                    ← 项目根目录
+├── iar/                             ← $PROJ_DIR$（工程根目录）
+│   ├── empty_mspm0g3519_nortos_iar.eww  ← IAR 工作区（从此打开）
+│   ├── empty_mspm0g3519_nortos_iar.ewp  ← IAR 工程文件
+│   ├── empty_mspm0g3519_nortos_iar.ipcf ← IAR Project Connection（SysConfig 构建规则）
+│   ├── empty_mspm0g3519.c           ← 主程序（LCD + LED + 蜂鸣器）
+│   ├── empty_mspm0g3519.syscfg      ← SysConfig 配置（全外设）
+│   ├── mspm0g3519.icf               ← 链接脚本
+│   ├── ti_msp_dl_config.c / .h      ← SysConfig 生成（不要手动编辑）
+│   ├── Event.dot                    ← SysConfig 生成
+│   └── iar/
+│       └── startup_mspm0g351x_iar.c ← 启动文件
+├── TSP3519/                          ← 板级支持库
+│   ├── tsp_common_headfile.h         ← 公共头文件枢纽
+│   ├── tsp_gpio.h / tsp_gpio.c       ← GPIO 宏封装
+│   └── TSP_TFT18.h / TSP_TFT18.c     ← TFT LCD 驱动（160×128）
+└── NUEDC2025/                        ← 中断服务
+    └── tsp_isr.h / tsp_isr.c         ← SysTick 延时 + UART ISR 框架
 ```
 
-> **注意**: SDK 原版示例的 `.ewp` 放在 `iar/` 子目录里导致 `$PROJ_DIR$` 指向 `iar/` 而非工程根目录，所有路径错位。本工程已将 `.ewp`/`.eww`/`.ipcf`/`.icf` 移到根目录。
+> **注意**: 此结构仿照老师参考例程，`$PROJ_DIR$` = `iar/`，库目录与工程目录平级。`.ewp` 中的路径使用 IAR 自定义变量（`$MSPM0_SDK_INSTALL_DIR$`、`$SYSCONFIG_ROOT$`），非硬编码。
 
 ### PB5 引脚映射
 
@@ -61,13 +69,45 @@ empty_mspm0g3519/                    ← $PROJ_DIR$（工程根目录）
 |---|---|---|---|
 | 26 (PB5) | `IOMUX_PINCM18` | `GPIOB`, `DL_GPIO_PIN_5` | `DL_GPIO_initDigitalOutput` + `DL_GPIO_enableOutput` |
 
-### LED 验证代码要点
+### 全板外设引脚（SysConfig 配置）
+
+| 类别 | 引脚 | 外设宏 | 功能 |
+|---|---|---|---|
+| **LED** | PB5 | `LED_ON/OFF/TOGGLE` | 低电平点亮 |
+| **蜂鸣器** | PA13 | `BUZZ_ON/OFF/TOGGLE` | 有源蜂鸣器 |
+| **TFT LCD** | SPI1: PB30(PICO), PB31(SCLK), PB14(POCI) | `LCD_INST`=SPI1 | 160×128 彩色屏，10MHz SPI |
+| **LCD 控制** | PA8(RST), PA9(BL), PB28(CS), PB29(DC) | `LCD_RST/BL/CS/DC` | 复位/背光/片选/数据命令 |
+| **按键** | PA18(S0), PC0(S1), PA16(S2), PA12(PUSH) | `S0/S1/S2/PUSH` | 数字输入 |
+| **编码器** | PA14(PHA0), PA15(PHB0) | `PHA0/PHB0` | PHA0 带双边沿中断 |
+| **CCD** | PC9(SI1), PB20(CLK1), PC4(SI2), PC5(CLK2) | `CCD_SI1/CLK1/SI2/CLK2` | 线性 CCD 接口 |
+| **电源控制** | PB1(SLEEP), PA7(FAULT) | `SLEEP/FAULT` | 睡眠/故障检测 |
+
+### 时钟配置
+
+- **CPUCLK = 80MHz**: HFXT 40MHz → SYSPLL (qDiv=3, pDiv=1, MCLK=CLK0) → 80MHz
+- Flash wait state = 2
+- **SysTick**: 1ms 中断 (period=80000)，驱动 `delay_1ms()`
+- **LFXT**: 32.768kHz 外部晶振已使能
+
+### 外设驱动 API 要点
 
 ```c
-DL_GPIO_initDigitalOutput(IOMUX_PINCM18);  // 1. 设引脚功能为 GPIO
-DL_GPIO_enableOutput(GPIOB, DL_GPIO_PIN_5); // 2. 开输出使能（容易漏！）
-DL_GPIO_setPins(GPIOB, DL_GPIO_PIN_5);      // 3. 初始高电平（LED 低有效 = 灭）
-DL_GPIO_togglePins(GPIOB, DL_GPIO_PIN_5);   // 4. 翻转
+// 初始化：全部由 SYSCFG_DL_init() 自动完成（GPIO/SPI/时钟/SysTick）
+SYSCFG_DL_init();
+
+// LED/蜂鸣器：通过 tsp_gpio.h 宏操作（已封装电平逻辑）
+LED_ON();     // = DL_GPIO_clearPins(GPIOB, PIN5) — 低电平点亮
+LED_OFF();    // = DL_GPIO_setPins(GPIOB, PIN5)
+LED_TOGGLE();
+BUZZ_ON();    // = DL_GPIO_setPins(GPIOA, PIN13)
+BUZZ_OFF();
+
+// SysTick 延时：tsp_isr.c 提供，1ms 单位（基于 80MHz CPUCLK）
+delay_1ms(100);  // 延时 100ms
+
+// TFT LCD：TSP_TFT18.c 驱动 SPI1
+tsp_tft18_init();         // 初始化 LCD
+tsp_tft18_show_str_color(0, 0, "text", BLUE, YELLOW);  // 显示字符串
 ```
 
 ### 调试器配置
@@ -78,9 +118,10 @@ DL_GPIO_togglePins(GPIOB, DL_GPIO_PIN_5);   // 4. 翻转
 
 ### 已知踩坑
 
-1. **IAR 全局变量持久化失败**: `global.custom_argvars` 在 IAR 关闭时会被覆盖，不能通过文件编辑设置。通过 IAR GUI `Tools → Configure Custom Argument Variables → Global` 设置 `MSPM0_SDK_INSTALL_DIR` 和 `SYSCONFIG_ROOT`
+1. **IAR 全局变量持久化失败**: `global.custom_argvars` 在 IAR 关闭时会被覆盖，不能通过文件编辑设置。通过 IAR GUI `Tools → Configure Custom Argument Variables → Global` 设置 `MSPM0_SDK_INSTALL_DIR`（指向 `C:\ti\mspm0_sdk_2_10_00_04`）和 `SYSCONFIG_ROOT`（指向 `D:\ti\ccs2100\ccs\utils\sysconfig_1.28.0`）。**注意**：本工程 `.custom_argvars` 使用 `MSPM0_SDK` 组名（非默认的 `TI` 组）
 2. **Flash loader 报 Device ID 不匹配**: TI 的 `FlashMSPM0GX51X.mac` 缺 CMSIS-DAP 分支，需手动添加 `|| __driverType("cmsisdap")`。已修复
-3. **DL_GPIO_initDigitalOutput 不设方向**: 该函数只配引脚功能为 GPIO，还需调用 `DL_GPIO_enableOutput` 才能输出
+3. **DL_GPIO_initDigitalOutput 不设方向**: 该函数只配引脚功能为 GPIO，还需调用 `DL_GPIO_enableOutput` 才能输出。SysConfig 生成的代码会自动处理
+4. **老师例程注意事项**: 老师提到有些细节需要后续说明，重组后的工程可能在老师补充说明后需要微调
 
 ## 参考文档
 

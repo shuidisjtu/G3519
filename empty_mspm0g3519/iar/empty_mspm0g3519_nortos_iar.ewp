@@ -382,8 +382,10 @@
                 <option>
                     <name>CCIncludePath2</name>
                     <state>$PROJ_DIR$</state>
-                    <state>C:\ti\mspm0_sdk_2_10_00_04\source\third_party\CMSIS\Core\Include</state>
-                    <state>C:\ti\mspm0_sdk_2_10_00_04\source</state>
+                    <state>$MSPM0_SDK_INSTALL_DIR$/source/third_party/CMSIS/Core/Include</state>
+                    <state>$MSPM0_SDK_INSTALL_DIR$/source</state>
+                    <state>$PROJ_DIR$\..\NUEDC2025</state>
+                    <state>$PROJ_DIR$\..\TSP3519</state>
                 </option>
                 <option>
                     <name>CCStdIncCheck</name>
@@ -640,6 +642,8 @@
                 <option>
                     <name>AUserIncludes</name>
                     <state>$PROJ_DIR$</state>
+                    <state>$PROJ_DIR$\..\TSP3519</state>
+                    <state>$PROJ_DIR$\..\NUEDC2025</state>
                 </option>
                 <option>
                     <name>AExtraOptionsCheckV2</name>
@@ -698,7 +702,7 @@
             <archiveVersion>4</archiveVersion>
             <data>
                 <extensions>.syscfg</extensions>
-                <cmdline>D:\ti\ccs2100\ccs\utils\sysconfig_1.28.0\sysconfig_cli.bat -o $PROJ_DIR$ -s "C:\ti\mspm0_sdk_2_10_00_04\.metadata\product.json" --compiler iar $FILE_PATH$</cmdline>
+                <cmdline>$SYSCONFIG_ROOT$/sysconfig_cli.bat -o $PROJ_DIR$ -s "$MSPM0_SDK_INSTALL_DIR$/.metadata/product.json" --compiler iar $FILE_PATH$</cmdline>
                 <buildSequence>preCompile</buildSequence>
                 <outputs>
                     <file>
@@ -824,7 +828,7 @@
                 </option>
                 <option>
                     <name>IlinkExtraOptions</name>
-                    <state>C:\ti\mspm0_sdk_2_10_00_04\source\ti\driverlib\lib\iar\m0p\mspm0gx51x\driverlib.a</state>
+                    <state>$MSPM0_SDK_INSTALL_DIR$/source/ti/driverlib/lib/iar/m0p/mspm0gx51x/driverlib.a</state>
                     <state>--silent</state>
                 </option>
                 <option>
@@ -1137,10 +1141,37 @@
     <group>
         <name>SysConfig Generated Files</name>
         <file>
+            <name>$PROJ_DIR$\Event.dot</name>
+        </file>
+        <file>
             <name>$PROJ_DIR$\ti_msp_dl_config.c</name>
         </file>
         <file>
             <name>$PROJ_DIR$\ti_msp_dl_config.h</name>
+        </file>
+    </group>
+    <group>
+        <name>NUEDC2025</name>
+        <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_isr.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_isr.h</name>
+        </file>
+    </group>
+    <group>
+        <name>TSP3519</name>
+        <file>
+            <name>$PROJ_DIR$\..\TSP3519\tsp_gpio.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\TSP3519\tsp_gpio.h</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\TSP3519\TSP_TFT18.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\TSP3519\TSP_TFT18.h</name>
         </file>
     </group>
     <file>
