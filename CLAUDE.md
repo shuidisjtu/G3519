@@ -121,9 +121,19 @@ tsp_tft18_show_str_color(0, 0, "text", BLUE, YELLOW);  // 显示字符串
 1. **IAR 全局变量持久化失败**: `global.custom_argvars` 在 IAR 关闭时会被覆盖，不能通过文件编辑设置。通过 IAR GUI `Tools → Configure Custom Argument Variables → Global` 设置 `MSPM0_SDK_INSTALL_DIR`（指向 `C:\ti\mspm0_sdk_2_10_00_04`）和 `SYSCONFIG_ROOT`（指向 `D:\ti\ccs2100\ccs\utils\sysconfig_1.28.0`）。**注意**：本工程 `.custom_argvars` 使用 `MSPM0_SDK` 组名（非默认的 `TI` 组）
 2. **Flash loader 报 Device ID 不匹配**: TI 的 `FlashMSPM0GX51X.mac` 缺 CMSIS-DAP 分支，需手动添加 `|| __driverType("cmsisdap")`。已修复
 3. **DL_GPIO_initDigitalOutput 不设方向**: 该函数只配引脚功能为 GPIO，还需调用 `DL_GPIO_enableOutput` 才能输出。SysConfig 生成的代码会自动处理
-4. **老师例程注意事项**: 老师提到有些细节需要后续说明，重组后的工程可能在老师补充说明后需要微调
+4. **下载调试时弹出设备锁定警告**: MSPM0G3519 首次下载或异常断开后芯片会进入锁定状态，IAR 弹出 "Device is locked" 警告框。**直接点 Yes/OK 执行 Mass Erase 解锁即可**，这是正常流程，不会损坏芯片。后续正常下载不会再出现
+
+### 环境搭建步骤
+
+1. **安装独立版 SysConfig**: 从 https://www.ti.com/tool/SYSCONFIG 下载安装，默认路径 `C:\ti\sysconfig_<version>\`
+2. **配置 IAR 集成 SysConfig**: IAR → `Tools` → `Configure Viewers` → `Import` → 选择 `C:\ti\mspm0_sdk_2_10_00_04\tools\iar\sysconfig_iar_setup.xml` → 确认
+3. **配置 IAR 全局变量**: IAR → `Tools` → `Configure Custom Argument Variables` → `Global` → 设置:
+   - `MSPM0_SDK_INSTALL_DIR` = `C:\ti\mspm0_sdk_2_10_00_04`
+   - `SYSCONFIG_ROOT` = `C:\ti\sysconfig_1.28.0`（独立版） 或 `D:\ti\ccs2100\ccs\utils\sysconfig_1.28.0`（CCS 自带）
 
 ## 参考文档
 
 - TI MSPM0 SDK: `C:\ti\mspm0_sdk_2_10_00_04`
 - IAR EWARM: `D:\iar\ewarm-9.60.3`
+- SysConfig 独立版: `C:\ti\sysconfig_1.28.0`
+- IAR SysConfig 集成配置: `C:\ti\mspm0_sdk_2_10_00_04\tools\iar\sysconfig_iar_setup.xml`
