@@ -40,6 +40,9 @@ Thumbs.db
 Desktop.ini
 $RECYCLE.BIN/
 
+# === Claude Code ===
+.claude/
+
 # === Editor / IDE ===
 .vscode/
 .idea/
