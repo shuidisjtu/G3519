@@ -1158,6 +1158,12 @@
         <file>
             <name>$PROJ_DIR$\..\NUEDC2025\tsp_isr.h</name>
         </file>
+        <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_key.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_key.h</name>
+        </file>
     </group>
     <group>
         <name>TSP3519</name>
@@ -1172,6 +1178,12 @@
         </file>
         <file>
             <name>$PROJ_DIR$\..\TSP3519\TSP_TFT18.h</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\TSP3519\tsp_menu.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\TSP3519\tsp_menu.h</name>
         </file>
     </group>
     <file>
