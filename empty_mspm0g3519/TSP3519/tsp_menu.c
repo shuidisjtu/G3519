@@ -12,13 +12,16 @@
 #define MENU_SEL_FG_COLOR   BLACK
 #define MENU_SEL_BG_COLOR   WHITE
 
+/* Blank line for clearing unused menu rows */
+#define MENU_BLANK_STR      "                    "
+
 /* Internal state */
 static const char       *g_title;
 static tsp_menu_item_t  *g_items;
 static uint8_t           g_count;
 static uint8_t           g_cursor;
 static uint8_t           g_cursor_prev;
-static uint8_t           g_needs_full;     /* 1 = full redraw (init/switch) */
+static uint8_t           g_needs_full;     /* 1 = full redraw (init/switch/after-action) */
 
 /* Draw a single menu row in selected or normal style */
 static void menu_draw_row(uint8_t idx)
@@ -87,24 +90,37 @@ uint8_t tsp_menu_run(void)
         }
     }
 
-    /* Confirm: S2 */
+    /* Confirm: S2 — execute action, then force full redraw */
     if (tsp_key_pressed(KEY_S2)) {
         if (g_items[g_cursor].action != NULL) {
             g_items[g_cursor].action();
+            /* Action may have overwritten LCD rows — need full redraw */
+            g_needs_full = 1;
         }
     }
 
-    /* Full redraw on init/switch */
+    /* Full redraw on init/switch/after-action */
     if (g_needs_full) {
         g_needs_full = 0;
 
+        /* Draw title and separator */
         tsp_tft18_show_str_color(0, MENU_TITLE_ROW,
                                  (uint8_t *)g_title, BLUE, YELLOW);
         tsp_tft18_draw_line_h(0, (MENU_TITLE_ROW + 1) * 16, 160, BLUE);
 
+        /* Draw new menu items */
         for (i = 0; i < g_count && i < MENU_ITEMS_MAX; i++) {
             menu_draw_row(i);
         }
+
+        /* Clear any remaining rows left over from previous menu
+         * (e.g. main menu has 6 items, sub-menu has only 2) */
+        for (; i < MENU_ITEMS_MAX; i++) {
+            tsp_tft18_show_str_color(0, MENU_ITEMS_START + i,
+                                     (uint8_t *)MENU_BLANK_STR,
+                                     MENU_FG_COLOR, MENU_BG_COLOR);
+        }
+
         return back;
     }
 
