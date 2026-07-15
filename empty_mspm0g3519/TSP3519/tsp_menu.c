@@ -28,10 +28,29 @@ void tsp_menu_init(const char *title, tsp_menu_item_t *items, uint8_t count)
     g_redraw = 1;
 }
 
-void tsp_menu_run(void)
+void tsp_menu_switch(const char *title, tsp_menu_item_t *items, uint8_t count)
+{
+    g_title  = title;
+    g_items  = items;
+    g_count  = count;
+    g_cursor = 0;
+    g_redraw = 1;
+}
+
+/*
+ * Run one cycle of menu logic.
+ * Returns 1 if back (KEY_PUSH) was pressed during this call.
+ */
+uint8_t tsp_menu_run(void)
 {
     uint8_t i;
     uint8_t row;
+    uint8_t back = 0;
+
+    /* Back/Exit: PUSH */
+    if (tsp_key_pressed(KEY_PUSH)) {
+        back = 1;
+    }
 
     /* Handle key navigation */
     if (tsp_key_pressed(KEY_S0)) {
@@ -52,22 +71,28 @@ void tsp_menu_run(void)
         g_redraw = 1;
     }
 
-    if (tsp_key_pressed(KEY_PUSH)) {
+    /* Confirm: S2 */
+    if (tsp_key_pressed(KEY_S2)) {
         if (g_items[g_cursor].action != NULL) {
             g_items[g_cursor].action();
         }
     }
 
-    /* S2: reserved for back, no action yet */
-
-    if (!g_redraw) return;
+    if (!g_redraw) return back;
     g_redraw = 0;
 
-    /* Clear and redraw title */
+    /* Clear menu area and redraw title */
     tsp_tft18_show_str_color(0, MENU_TITLE_ROW, (uint8_t *)g_title, BLUE, YELLOW);
 
     /* Draw separator line under title */
     tsp_tft18_draw_line_h(0, (MENU_TITLE_ROW + 1) * 16, 160, BLUE);
+
+    /* Clear old items */
+    for (i = 0; i < MENU_ITEMS_MAX; i++) {
+        row = MENU_ITEMS_START + i;
+        tsp_tft18_show_str_color(0, row, (uint8_t *)"                    ",
+                                 WHITE, BLACK);
+    }
 
     /* Draw menu items */
     for (i = 0; i < g_count && i < MENU_ITEMS_MAX; i++) {
@@ -83,4 +108,6 @@ void tsp_menu_run(void)
                                      MENU_FG_COLOR, MENU_BG_COLOR);
         }
     }
+
+    return back;
 }
