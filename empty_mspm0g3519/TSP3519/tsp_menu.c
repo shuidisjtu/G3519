@@ -23,16 +23,31 @@ static uint8_t           g_cursor;
 static uint8_t           g_cursor_prev;
 static uint8_t           g_needs_full;     /* 1 = full redraw (init/switch/after-action) */
 
-/* Draw a single menu row in selected or normal style */
+/* Draw a single menu row in selected or normal style.
+ * Pads text to 20 characters (160px at 8px font) so the background
+ * color covers the full row — prevents highlight residue from
+ * previous selection when menu items have different text lengths. */
 static void menu_draw_row(uint8_t idx)
 {
-    uint8_t row = MENU_ITEMS_START + idx;
+    uint8_t     row = MENU_ITEMS_START + idx;
+    const char *src = g_items[idx].text;
+    uint8_t     buf[21];  /* 20 chars + null */
+    uint8_t     j;
+
+    /* Copy text, then pad with spaces to full width */
+    for (j = 0; j < 20 && src[j]; j++) {
+        buf[j] = (uint8_t)src[j];
+    }
+    for (; j < 20; j++) {
+        buf[j] = ' ';
+    }
+    buf[20] = '\0';
 
     if (idx == g_cursor) {
-        tsp_tft18_show_str_color(0, row, (uint8_t *)g_items[idx].text,
+        tsp_tft18_show_str_color(0, row, buf,
                                  MENU_SEL_FG_COLOR, MENU_SEL_BG_COLOR);
     } else {
-        tsp_tft18_show_str_color(0, row, (uint8_t *)g_items[idx].text,
+        tsp_tft18_show_str_color(0, row, buf,
                                  MENU_FG_COLOR, MENU_BG_COLOR);
     }
 }
