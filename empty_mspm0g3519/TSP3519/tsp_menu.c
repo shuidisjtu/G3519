@@ -108,6 +108,12 @@ uint8_t tsp_menu_run(void)
     /* Confirm: S2 — execute action, then force full redraw */
     if (tsp_key_pressed(KEY_S2)) {
         if (g_items[g_cursor].action != NULL) {
+            /* Clear full screen so action starts with a clean workspace */
+            for (i = 0; i < 8; i++) {
+                tsp_tft18_show_str_color(0, i,
+                                         (uint8_t *)MENU_BLANK_STR,
+                                         MENU_FG_COLOR, MENU_BG_COLOR);
+            }
             g_items[g_cursor].action();
             /* Action may have overwritten LCD rows — need full redraw */
             g_needs_full = 1;

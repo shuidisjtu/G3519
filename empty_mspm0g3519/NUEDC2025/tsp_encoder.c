@@ -18,8 +18,11 @@ void tsp_encoder_init(void)
     g_enc_speed      = 0;
     g_enc_last_tick  = sys_tick_counter;
 
-    /* PHA0 interrupt is already enabled by SYSCFG_DL_init() via SysConfig.
-     * No additional init needed — GPIOA IRQ is routed through GROUP1_IRQHandler. */
+    /* Disable PHA0 interrupt on startup to prevent spurious triggers
+     * from floating pin when no encoder is connected.
+     * Re-enable via DL_GPIO_enableInterrupt(GPIOA, DL_GPIO_PIN_14)
+     * once a physical encoder is attached. */
+    DL_GPIO_disableInterrupt(GPIOA, DL_GPIO_PIN_14);
 }
 
 /*
