@@ -1,6 +1,7 @@
 #include "tsp_ccd.h"
 #include "tsp_gpio.h"
 #include "tsp_isr.h"
+#include <intrinsics.h>
 
 /* ===== ADC12 Configuration =====
  * CCD analog input pins (same as HSP):

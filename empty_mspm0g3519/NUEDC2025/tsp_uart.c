@@ -9,12 +9,12 @@
 #define TSP_UART_INT_IRQN   UART0_INT_IRQn
 
 /* UART0 RX pin: PA10 -> IOMUX_PINCM32, alternate function UART0_RX */
-#define UART_RX_IOMUX       IOMUX_PINCM32
-#define UART_RX_FUNC        IOMUX_PINCM32_PF_UART0_RX
+#define UART_RX_IOMUX       IOMUX_PINCM22
+#define UART_RX_FUNC        IOMUX_PINCM22_PF_UART0_RX
 
-/* UART0 TX pin: PA11 -> IOMUX_PINCM33, alternate function UART0_TX */
-#define UART_TX_IOMUX       IOMUX_PINCM33
-#define UART_TX_FUNC        IOMUX_PINCM33_PF_UART0_TX
+/* UART0 TX pin: PB2 -> IOMUX_PINCM21, alternate function UART0_TX */
+#define UART_TX_IOMUX       IOMUX_PINCM21
+#define UART_TX_FUNC        IOMUX_PINCM21_PF_UART0_TX
 
 /* ─── Ring buffer ─── */
 static volatile uint8_t  g_uart_rx_buf[UART_RX_BUF_SIZE];
@@ -121,18 +121,18 @@ void tsp_uart_isr(void)
     DL_UART_IIDX status = DL_UART_getPendingInterrupt(TSP_UART);
 
     /* RX data available */
-    if (status & DL_UART_INTERRUPT_RX) {
+    if (status == DL_UART_IIDX_RX) {
         uint8_t data = (uint8_t)DL_UART_receiveData(TSP_UART);
         uint16_t next_in = (g_uart_rx_in + 1) % UART_RX_BUF_SIZE;
 
-        /* Ring buffer: drop byte if full (overflow protection, matching HSP) */
+        /* Ring buffer: drop byte if full (overflow protection) */
         if (next_in != g_uart_rx_out) {
             g_uart_rx_buf[g_uart_rx_in] = data;
             g_uart_rx_in = next_in;
         }
     }
 
-    DL_UART_clearInterruptStatus(TSP_UART, status);
+	DL_UART_clearInterruptStatus(TSP_UART, DL_UART_INTERRUPT_RX);
 }
 
 /* ================================================================

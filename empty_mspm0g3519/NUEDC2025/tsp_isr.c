@@ -31,17 +31,14 @@ void GROUP1_IRQHandler(void)
     uint32_t group_iidx;
 
     /* Determine which IIDX triggered GROUP1 */
-    group_iidx = DL_Interrupt_getPendingGroup(DL_INTERRUPT_GROUP1);
+    group_iidx = DL_Interrupt_getPendingGroup(DL_INTERRUPT_GROUP_1);
 
     switch (group_iidx) {
     case DL_INTERRUPT_GROUP1_IIDX_GPIOA: {
-        /* Iterate individual GPIOA pin interrupts */
-        uint8_t dio_idx;
-        while (DL_GPIO_getPendingInterrupt(GPIOA, &dio_idx)) {
-            /* Encoder: PHA0 (PA14) quadrature decode */
-            tsp_encoder_isr(dio_idx);
-            DL_GPIO_clearInterruptStatus(GPIOA, dio_idx);
-        }
+        /* Get highest priority pending GPIOA pin interrupt */
+        DL_GPIO_IIDX dio_iidx = DL_GPIO_getPendingInterrupt(GPIOA);
+        tsp_encoder_isr((uint8_t)dio_iidx);
+        DL_GPIO_clearInterruptStatus(GPIOA, dio_iidx);
         break;
     }
     default:
