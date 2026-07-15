@@ -60,10 +60,15 @@ static void action_counter(void)
 	tsp_tft18_show_str_color(0, 6, (uint8_t *)"PUSH to return...",
 	                         CYAN, BLACK);
 
-	/* Wait for PUSH to dismiss */
+	/* S2=increment, PUSH=exit */
 	while (1) {
 		tsp_key_scan();
 		if (tsp_key_pressed(KEY_PUSH)) break;
+		if (tsp_key_pressed(KEY_S2)) {
+			cnt++;
+			tsp_tft18_show_str_color(0, 7, (uint8_t *)"Count:", YELLOW, BLACK);
+			tsp_tft18_show_uint16(48, 7, (uint16_t)cnt);
+		}
 		delay_1ms(10);
 	}
 
