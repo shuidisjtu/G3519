@@ -19,8 +19,8 @@ static uint8_t key_read(uint8_t key)
     switch (key) {
         case KEY_S0:   return (S0() != 0) ? 1 : 0;
         case KEY_S1:   return (S1() != 0) ? 1 : 0;
-        case KEY_S2:   return (S2() != 0) ? 1 : 0;
-        case KEY_PUSH: return (PUSH() != 0) ? 1 : 0;
+        case KEY_S2:   return (PUSH() != 0) ? 1 : 0;
+        case KEY_PUSH: return (S2() != 0) ? 1 : 0;
         default:       return 0;
     }
 }
