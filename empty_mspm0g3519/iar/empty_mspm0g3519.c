@@ -4,6 +4,9 @@
 #include "TSP_TFT18.h"
 #include "tsp_key.h"
 #include "tsp_menu.h"
+#include "tsp_encoder.h"
+#include "tsp_uart.h"
+#include "tsp_ccd.h"
 
 /* ===== Global state ===== */
 extern volatile uint32_t sys_tick_counter;
@@ -89,12 +92,79 @@ static void action_about(void)
 	tsp_tft18_show_str_color(0, 7, blank, WHITE, BLACK);
 }
 
+/* ===== Encoder Test ===== */
+
+static void action_encoder(void)
+{
+	uint8_t  blank[] = "                    ";
+	int32_t  count, last_count = 0;
+	int16_t  speed;
+
+	tsp_tft18_show_str_color(0, 6, (uint8_t *)"Enc: PUSH=exit",
+	                         CYAN, BLACK);
+
+	while (1) {
+		tsp_key_scan();
+		if (tsp_key_pressed(KEY_PUSH)) break;
+
+		count = tsp_encoder_get_count();
+		speed = tsp_encoder_get_speed();
+
+		if (count != last_count) {
+			last_count = count;
+			tsp_tft18_show_str_color(0, 7, (uint8_t *)"Cnt:", YELLOW, BLACK);
+			tsp_tft18_show_int16(40, 7, (int16_t)count);
+			tsp_tft18_show_str_color(100, 7, (uint8_t *)"Spd:", GREEN, BLACK);
+			tsp_tft18_show_int16(136, 7, speed);
+		}
+		delay_1ms(10);
+	}
+
+	tsp_tft18_show_str_color(0, 6, blank, WHITE, BLACK);
+	tsp_tft18_show_str_color(0, 7, blank, WHITE, BLACK);
+}
+
+/* ===== CCD Test ===== */
+
+static void action_ccd(void)
+{
+	uint8_t     blank[] = "                    ";
+	ccd_data_t  ccd_buf;
+
+	tsp_tft18_show_str_color(0, 6, (uint8_t *)"CCD1 capturing...",
+	                         CYAN, BLACK);
+
+	tsp_ccd_snapshot(CCD1, ccd_buf);
+
+	tsp_tft18_show_str_color(0, 6, (uint8_t *)"CCD1: PUSH=return",
+	                         CYAN, BLACK);
+
+	/* Show first pixel value */
+	tsp_tft18_show_str_color(0, 7, (uint8_t *)"P0:", YELLOW, BLACK);
+	tsp_tft18_show_uint16(24, 7, ccd_buf[0]);
+
+	while (1) {
+		tsp_key_scan();
+		if (tsp_key_pressed(KEY_PUSH)) break;
+		delay_1ms(10);
+	}
+
+	tsp_tft18_show_str_color(0, 6, blank, WHITE, BLACK);
+	tsp_tft18_show_str_color(0, 7, blank, WHITE, BLACK);
+}
+
+/* ===== Main Menu (6 items) ===== */
+
 static tsp_menu_item_t main_menu[] = {
 	{"LED Menu",      action_enter_led},
 	{"Buzzer Test",   action_buzzer},
 	{"Show Counter",  action_counter},
+	{"Encoder Test",  action_encoder},
+	{"CCD Test",      action_ccd},
 	{"About",         action_about},
 };
+
+#define MAIN_MENU_COUNT  (sizeof(main_menu) / sizeof(main_menu[0]))
 
 /* ===== Main ===== */
 
@@ -104,14 +174,26 @@ int main(void)
 
 	tsp_tft18_init();
 
+	/* Init encoder (uses SysConfig PHA0 interrupt) */
+	tsp_encoder_init();
+
+	/* Init UART0 for printf debug output (115200-8N1 on PA10/PA11) */
+	tsp_uart_init(115200);
+
+	/* Init CCD (manual ADC + GPIO for TSL1401) */
+	tsp_ccd_init();
+
 	/* Startup beep */
 	BUZZ_ON();
 	delay_1ms(50);
 	BUZZ_OFF();
 
+	/* Hello via UART */
+	tsp_uart_send_string("\r\n=== MSPM0G3519 NUEDC-2026 ===\r\n");
+	tsp_uart_send_string("UART0 online @ 115200\r\n");
+
 	tsp_key_init();
-	tsp_menu_init("=== NUEDC 2026 ===", main_menu,
-	              sizeof(main_menu) / sizeof(main_menu[0]));
+	tsp_menu_init("=== NUEDC 2026 ===", main_menu, MAIN_MENU_COUNT);
 
 	while (1) {
 		tsp_key_scan();
@@ -129,7 +211,8 @@ int main(void)
 		if (tsp_menu_run()) {
 			if (g_in_submenu) {
 				/* Return from sub-menu to main menu */
-				tsp_menu_switch("=== NUEDC 2026 ===", main_menu, 4);
+				tsp_menu_switch("=== NUEDC 2026 ===", main_menu,
+				                MAIN_MENU_COUNT);
 				g_in_submenu = 0;
 				g_blink_on   = 0;
 				LED_OFF();
