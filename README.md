@@ -4,18 +4,19 @@
 
 ## 功能概览
 
-启动后播放**开机动画**（色彩测试 → 启动信息 → LED 闪烁 + 蜂鸣器短响），然后进入 **TFT LCD 菜单界面**，支持 4 项交互功能：
+启动后播放**开机动画**（色彩测试 → 启动信息 → LED 闪烁 + 蜂鸣器短响），然后进入 **TFT LCD 菜单界面**，支持 5 项交互功能：
 
 | 菜单项 | 功能 |
 |---|---|
 | **LED Menu** | 子菜单：LED Toggle（翻转）/ LED Blink（~2Hz 背景闪烁） |
 | **Buzzer Test** | 蜂鸣器短响 80ms |
-| **Show Counter** | 计数器演示（S2 递增，PUSH 退出） |
+| **Show Counter** | 计数器演示（4 键计数，PUSH 退出） |
+| **UART Test** | UART0 串口测试（TX / printf / RX 回显 + LCD 显示） |
 | **About** | 显示 "NUEDC-2026 SAIS@SJTU" |
 
 按键角色：**S0**=上移、**S1**=下移、**S2**=确认、**PUSH**=返回
 
-> **暂未启用的模块**：UART0（未在 main 中初始化）、CCD（无外接模块）、编码器菜单项（编码器驱动已初始化但未加入菜单）。代码保留在工程中，接上硬件后可直接启用。
+> **暂未启用的模块**：CCD（无外接模块）、编码器菜单项（编码器驱动已初始化但未加入菜单）。代码保留在工程中，接上硬件后可直接启用。
 
 ## 硬件连接
 
@@ -28,7 +29,7 @@
 | **按键** | S0(PA18)、S1(PC0)、S2(PA16)、PUSH(PA12) |
 | **编码器** | PHA0(PA14, 双边沿中断)、PHB0(PA15) |
 | **CCD** | TSL1401 双通道，SI/CLK GPIO + ADC0(PC2/PC3) |
-| **UART** | UART0 115200-8N1，PA10(TX)/PA11(RX) [未启用] |
+| **UART** | UART0 MFCLK 4MHz, 115200-8N1，PA10(TX)/PA11(RX) |
 | **调试器** | DAPLink (CMSIS-DAP v2, VID_0D28&PID_0204) |
 | **供电** | USB-C，禁止多路同时供电 |
 
@@ -134,7 +135,7 @@ empty_mspm0g3519/
     ├── tsp_isr.h / tsp_isr.c         ← SysTick 延时 + GROUP1/UART0 中断分发
     ├── tsp_key.h / tsp_key.c         ← 4键扫描（20ms 消抖，边沿检测）
     ├── tsp_encoder.h / tsp_encoder.c ← 编码器驱动（PHA0 中断正交解码）
-    └── tsp_uart.h / tsp_uart.c       ← UART0 通信（环形缓冲 RX，printf 重定向）[未启用]
+    └── tsp_uart.h / tsp_uart.c       ← UART0 通信（MFCLK 4MHz, 环形缓冲 RX, printf 重定向）
 ```
 
 ## 已知问题

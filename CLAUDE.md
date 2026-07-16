@@ -27,7 +27,7 @@ empty_mspm0g3519/
     ├── tsp_isr.h/.c                   ← SysTick 延时 + GROUP1 中断分发
     ├── tsp_key.h/.c                   ← 4 键扫描（20ms 消抖，边沿检测）
     ├── tsp_encoder.h/.c               ← 编码器（PHA0 中断正交解码，20ms 速度）
-    └── tsp_uart.h/.c                  ← UART0（115200-8N1，环形缓冲 RX）[未启用，波特率待修复]
+    └── tsp_uart.h/.c                  ← UART0（MFCLK 4MHz, 115200-8N1, 环形缓冲 RX）
 ```
 
 ## 关键硬件约束
@@ -62,7 +62,7 @@ SYSCFG_DL_init();                      // SysConfig 生成（GPIO/SPI/时钟/Sys
 tsp_tft18_init();                      // LCD
 boot_animation();                      // 开机动画（色彩测试+启动信息+蜂鸣器）
 tsp_encoder_init();                    // 编码器（默认禁用 PHA0 中断）
-// tsp_uart_init(115200);              // UART0 [未启用，波特率待修复]
+tsp_uart_init(115200);                  // UART0（SysConfig 预设 MFCLK 4MHz 时钟）
 // tsp_ccd_init();                     // CCD [未启用，无外接模块]
 tsp_key_init();                        // 按键
 tsp_menu_init(title, items, count);    // 菜单
@@ -95,10 +95,13 @@ int32_t cnt = tsp_encoder_get_count(); // 原子读取
 int16_t spd = tsp_encoder_get_speed(); // 脉冲/20ms
 tsp_encoder_reset();
 
-// ===== UART（tsp_uart.c） =====
+// ===== UART（tsp_uart.c，时钟=MFCLK 4MHz，PD0 安全） =====
+tsp_uart_init(115200);                  // SysConfig 预设后再调（仅改波特率+缓冲）
 tsp_uart_send_string("hello\r\n");
 printf("val=%d\n", x);                 // 已重定向到 UART0
 if (tsp_uart_available()) { uint8_t ch = tsp_uart_read_byte(); }
+tsp_uart_rx_enable();                   // 按需开启 RX 中断（防止浮空噪声风暴）
+tsp_uart_rx_disable();                  // 用完后关闭 RX 中断
 
 // ===== CCD（tsp_ccd.c） =====
 ccd_data_t pixels;                     // uint16_t[128]

@@ -159,7 +159,27 @@ UART 支持以下通用功能：
 - 降低波特率，关闭过长的 RX 抗干扰滤波，检查信号完整性。
 - 若通过外部 RS-232/RS-485 收发器，确认收发器方向控制和电平转换逻辑正确。
 
-## 11. 资料依据
+## 11. G3519 平台已验证配置
+
+以下配置在 NUEDC-2026 G3519 平台上通过 SSCOM 串口调试助手验证（2026-07-16）：
+
+| 项目 | 配置 |
+|------|------|
+| UART 实例 | UART0 (PD0, 低功耗域) |
+| 时钟源 | MFCLK = 4 MHz（SysConfig 管理） |
+| 波特率 | 115200, 8N1, 无流控 |
+| TX 引脚 | PA10 (IOMUX_PINCM21) |
+| RX 引脚 | PA11 (IOMUX_PINCM22) |
+| PC 端 | DAPLink 虚拟串口 (COM11) |
+
+### 关键注意事项
+
+1. **UART0 在 PD0 域**，最大输入时钟 40 MHz。不可直接用 BUSCLK (80 MHz) 作为时钟源。
+2. **SysConfig 管理时钟和引脚**：手动 `DL_UART_setClockConfig(BUSCLK)` 会失败，应在 `.syscfg` 中添加 UART 模块并选用 MFCLK。
+3. **RX 中断按需开启**：`tsp_uart_init()` 不启用 RX 中断，需调用 `tsp_uart_rx_enable()` 后才接收。防止浮空引脚产生中断风暴（与编码器 PHA0 问题同根因）。
+4. **波特率调整**：SysConfig 预设 9600，应用层通过 `DL_UART_configBaudRate(uart, 4000000, 115200)` 覆盖。
+
+## 12. 资料依据
 
 - `M0G3519 电路图.pdf`，第 1 页：MCU 引脚复用、DAPLink 区域及 UART 网络/排针引出。
 - `MSPM0G351x、MSPM0G151x、MSPM0G351x-Q1、MSPM0G3529-Q1 微控制器.pdf`：器件资源、引脚复用和 UART 章节。
