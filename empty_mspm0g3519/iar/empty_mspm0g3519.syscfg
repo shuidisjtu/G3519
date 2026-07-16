@@ -16,6 +16,8 @@ const GPIO2         = GPIO.addInstance();
 const GPIO3         = GPIO.addInstance();
 const SPI           = scripting.addModule("/ti/driverlib/SPI", {}, false);
 const SPI1          = SPI.addInstance();
+const UART          = scripting.addModule("/ti/driverlib/UART", {}, false);
+const UART1         = UART.addInstance();
 const SYSCTL        = scripting.addModule("/ti/driverlib/SYSCTL");
 const SYSTICK       = scripting.addModule("/ti/driverlib/SYSTICK");
 const ProjectConfig = scripting.addModule("/ti/project_config/ProjectConfig");
@@ -141,6 +143,12 @@ SPI1.peripheral.$assign                 = "SPI1";
 SPI1.peripheral.sclkPin.$assign         = "PB31";
 SPI1.peripheral.mosiPin.$assign         = "PB30";
 SPI1.peripheral.misoPin.$assign         = "PB14";
+
+UART1.$name                    = "UART_0";
+UART1.uartClkSrc               = "MFCLK";
+UART1.peripheral.$assign       = "UART0";
+UART1.peripheral.rxPin.$assign = "PA11";
+UART1.peripheral.txPin.$assign = "PA10";
 
 SYSCTL.clockTreeEn = true;
 scripting.suppress("For best practices when the CPUCLK is running at 32MHz and above, clear the flash status bit using DL_FlashCTL_executeClearStatus\\(\\) before executing any flash operation\\. Otherwise there may be false positives\\.", SYSCTL);

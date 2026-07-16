@@ -30,8 +30,10 @@ void tsp_uart_send_string(const char *str);
 uint8_t  tsp_uart_read_byte(void);       /* returns 0 if buffer empty */
 uint16_t tsp_uart_available(void);       /* bytes available in ring buffer */
 void     tsp_uart_flush_rx(void);        /* clear ring buffer */
+void     tsp_uart_rx_enable(void);       /* enable RX interrupt (on-demand) */
+void     tsp_uart_rx_disable(void);      /* disable RX interrupt */
 
-/* Called from UART ISR (GROUP1_IRQHandler or UART0_IRQHandler) */
+/* Called from UART ISR (UART0_IRQHandler) */
 void tsp_uart_isr(void);
 
 #endif

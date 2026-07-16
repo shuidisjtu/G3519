@@ -21,56 +21,43 @@ static volatile uint8_t  g_uart_rx_buf[UART_RX_BUF_SIZE];
 static volatile uint16_t g_uart_rx_in;   /* write index (ISR) */
 static volatile uint16_t g_uart_rx_out;  /* read index (main) */
 
-/* ─── Init ─── */
+/* ─── Init ───
+ * SysConfig (SYSCFG_DL_UART_0_init via SYSCFG_DL_init) handles:
+ *   - Power, IOMUX, clock source (MFCLK=4MHz), basic config (8N1),
+ *     OVS=16X, baud rate preset to 9600, UART enable.
+ * This function only adjusts baud rate and sets up the ring buffer.
+ * Call AFTER SYSCFG_DL_init() in main(). */
 void tsp_uart_init(uint32_t baudrate)
 {
-    /* 0. Power up UART0 (MSPM0 peripherals require explicit power enable) */
-    DL_UART_reset(TSP_UART);
-    DL_UART_enablePower(TSP_UART);
-    /* Brief delay for power stabilization */
-    delay_1ms(1);
+    /* 1. Update baud rate: SysConfig preset is 9600, override with requested rate.
+     *    Clock = MFCLK = 4 MHz (set by SysConfig, confirmed PD0-safe).
+     *    Using DL_UART_configBaudRate for auto OVS selection. */
+    DL_UART_configBaudRate(TSP_UART, UART_0_INST_FREQUENCY, baudrate);
 
-    /* 1. Configure IOMUX for RX and TX pins */
-    DL_GPIO_initPeripheralFunction(UART_RX_IOMUX, UART_RX_FUNC);
-    DL_GPIO_initPeripheralFunction(UART_TX_IOMUX, UART_TX_FUNC);
-
-    /* 2. Configure UART peripheral (struct-based init) */
-    DL_UART_Config uartCfg;
-    uartCfg.mode        = DL_UART_MODE_NORMAL;
-    uartCfg.direction   = DL_UART_DIRECTION_TX_RX;
-    uartCfg.flowControl = DL_UART_FLOW_CONTROL_NONE;
-    uartCfg.parity      = DL_UART_PARITY_NONE;
-    uartCfg.wordLength  = DL_UART_WORD_LENGTH_8_BITS;
-    uartCfg.stopBits    = DL_UART_STOP_BITS_ONE;
-    DL_UART_init(TSP_UART, &uartCfg);
-
-    /* 3. Clock config: BUSCLK (80MHz), no divider */
-    DL_UART_ClockConfig clkCfg;
-    clkCfg.clockSel    = DL_UART_CLOCK_BUSCLK;
-    clkCfg.divideRatio = DL_UART_CLOCK_DIVIDE_RATIO_1;
-    DL_UART_setClockConfig(TSP_UART, &clkCfg);
-
-    /* 4. Baud rate: IBRD + FBRD (16x oversampling)
-     *    IBRD = BUSCLK / (16 * baudRate)           (integer part)
-     *    FBRD = round((fraction) * 64)             (fractional part)
-     *    For 80MHz / (16 * 115200) = 43.403 -> IBRD=43, FBRD=round(0.403*64)=26 */
-    uint32_t ibrd = 80000000u / (16u * baudrate);
-    uint32_t remainder = 80000000u - ibrd * 16u * baudrate;
-    uint32_t fbrd = (remainder * 64u + 8u * baudrate) / (16u * baudrate);
-    DL_UART_setBaudRateDivisor(TSP_UART, ibrd, fbrd);
-
-    /* 5. Enable UART */
+    /* 2. Ensure UART is enabled (SysConfig does this, but be defensive) */
     DL_UART_enable(TSP_UART);
 
-    /* 6. Enable RX interrupt */
-    DL_UART_enableInterrupt(TSP_UART, DL_UART_INTERRUPT_RX);
-
-    /* 7. Enable UART0 interrupt in NVIC */
+    /* 3. Enable UART0 interrupt in NVIC (handler in tsp_isr.c → tsp_uart_isr).
+     *    RX interrupt at UART level is NOT enabled here — use tsp_uart_rx_enable()
+     *    on demand to prevent floating-pin interrupt storms. */
     NVIC_EnableIRQ(TSP_UART_INT_IRQN);
 
-    /* 8. Init ring buffer */
+    /* 4. Init ring buffer */
     g_uart_rx_in  = 0;
     g_uart_rx_out = 0;
+}
+
+/* ─── RX enable/disable (call only when ready to receive) ─── */
+void tsp_uart_rx_enable(void)
+{
+    g_uart_rx_in  = 0;
+    g_uart_rx_out = 0;
+    DL_UART_enableInterrupt(TSP_UART, DL_UART_INTERRUPT_RX);
+}
+
+void tsp_uart_rx_disable(void)
+{
+    DL_UART_disableInterrupt(TSP_UART, DL_UART_INTERRUPT_RX);
 }
 
 /* ─── TX (blocking) ─── */
@@ -117,9 +104,7 @@ uint16_t tsp_uart_available(void)
 
 void tsp_uart_flush_rx(void)
 {
-    DL_UART_disableInterrupt(TSP_UART, DL_UART_INTERRUPT_RX);
     g_uart_rx_out = g_uart_rx_in;
-    DL_UART_enableInterrupt(TSP_UART, DL_UART_INTERRUPT_RX);
 }
 
 /* ─── ISR ─── */
