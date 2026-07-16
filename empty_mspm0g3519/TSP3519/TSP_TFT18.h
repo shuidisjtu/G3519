@@ -1,5 +1,5 @@
 #ifndef _TSP_TFT18_H
-#define _HSP_TFT18_H
+#define _TSP_TFT18_H
 
 #include "tsp_gpio.h"
 
@@ -40,7 +40,6 @@
 #define GRAY2RGB16_hl(t) ((t << 5) | ((t&~3)<<11) | (t & ~7))
 
 void tsp_tft18_init(void);
-static uint8_t hsp_spi_write_byte(uint8_t dat);
 void tsp_tft18_write_cmd(uint8_t dat);
 void tsp_tft18_write_byte(uint8_t dat);
 void tsp_tft18_write_2byte(uint16_t dat);

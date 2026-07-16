@@ -1,18 +1,18 @@
 #include "tsp_uart.h"
 
 /* ===== UART0 Pin Configuration =====
- * Default: PA10 = RX, PA11 = TX.
+ * Default: PA10 = TX, PA11 = RX (matching schematic).
  * These pins are free (not in current SysConfig).
  * Change IOMUX macros below if using different pins.
  */
 #define TSP_UART            UART0
 #define TSP_UART_INT_IRQN   UART0_INT_IRQn
 
-/* UART0 RX pin: PA10 -> IOMUX_PINCM32, alternate function UART0_RX */
+/* UART0 RX pin: PA11 -> IOMUX_PINCM22, alternate function UART0_RX */
 #define UART_RX_IOMUX       IOMUX_PINCM22
 #define UART_RX_FUNC        IOMUX_PINCM22_PF_UART0_RX
 
-/* UART0 TX pin: PB2 -> IOMUX_PINCM21, alternate function UART0_TX */
+/* UART0 TX pin: PA10 -> IOMUX_PINCM21, alternate function UART0_TX */
 #define UART_TX_IOMUX       IOMUX_PINCM21
 #define UART_TX_FUNC        IOMUX_PINCM21_PF_UART0_TX
 
@@ -24,6 +24,12 @@ static volatile uint16_t g_uart_rx_out;  /* read index (main) */
 /* ─── Init ─── */
 void tsp_uart_init(uint32_t baudrate)
 {
+    /* 0. Power up UART0 (MSPM0 peripherals require explicit power enable) */
+    DL_UART_reset(TSP_UART);
+    DL_UART_enablePower(TSP_UART);
+    /* Brief delay for power stabilization */
+    delay_1ms(1);
+
     /* 1. Configure IOMUX for RX and TX pins */
     DL_GPIO_initPeripheralFunction(UART_RX_IOMUX, UART_RX_FUNC);
     DL_GPIO_initPeripheralFunction(UART_TX_IOMUX, UART_TX_FUNC);
@@ -45,11 +51,12 @@ void tsp_uart_init(uint32_t baudrate)
     DL_UART_setClockConfig(TSP_UART, &clkCfg);
 
     /* 4. Baud rate: IBRD + FBRD (16x oversampling)
-     *    divisor = BUSCLK / (16 * baudRate)
-     *    For 80MHz / (16 * 115200) = 43.40 -> IBRD=43, FBRD=26 */
-    uint32_t divisor = (80000000u + (8u * baudrate)) / (16u * baudrate);
-    uint32_t ibrd    = divisor / 64u;
-    uint32_t fbrd    = divisor % 64u;
+     *    IBRD = BUSCLK / (16 * baudRate)           (integer part)
+     *    FBRD = round((fraction) * 64)             (fractional part)
+     *    For 80MHz / (16 * 115200) = 43.403 -> IBRD=43, FBRD=round(0.403*64)=26 */
+    uint32_t ibrd = 80000000u / (16u * baudrate);
+    uint32_t remainder = 80000000u - ibrd * 16u * baudrate;
+    uint32_t fbrd = (remainder * 64u + 8u * baudrate) / (16u * baudrate);
     DL_UART_setBaudRateDivisor(TSP_UART, ibrd, fbrd);
 
     /* 5. Enable UART */
@@ -130,9 +137,9 @@ void tsp_uart_isr(void)
             g_uart_rx_buf[g_uart_rx_in] = data;
             g_uart_rx_in = next_in;
         }
-    }
 
-	DL_UART_clearInterruptStatus(TSP_UART, DL_UART_INTERRUPT_RX);
+        DL_UART_clearInterruptStatus(TSP_UART, DL_UART_INTERRUPT_RX);
+    }
 }
 
 /* ================================================================

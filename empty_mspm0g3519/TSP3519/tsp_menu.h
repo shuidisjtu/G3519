@@ -12,5 +12,6 @@ typedef struct {
 void tsp_menu_init(const char *title, tsp_menu_item_t *items, uint8_t count);
 void tsp_menu_switch(const char *title, tsp_menu_item_t *items, uint8_t count);
 uint8_t tsp_menu_run(void);     /* call in main loop; returns 1 if back pressed */
+void tsp_menu_request_redraw(void);  /* leaf action sets this to trigger full redraw */
 
 #endif

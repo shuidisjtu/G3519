@@ -61,7 +61,15 @@ void tsp_encoder_update_speed(void)
 
     if (elapsed >= ENC_SPEED_INTERVAL_MS) {
         static int32_t last_count;
+        static uint8_t first_run = 1;
         int32_t current = g_enc_count;
+
+        if (first_run) {
+            /* Sync baseline on first call to avoid initial speed spike */
+            last_count = current;
+            first_run  = 0;
+        }
+
         g_enc_speed      = (int16_t)(current - last_count);
         last_count       = current;
         g_enc_last_tick  = now;

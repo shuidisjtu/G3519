@@ -72,6 +72,14 @@ void tsp_menu_switch(const char *title, tsp_menu_item_t *items, uint8_t count)
     g_needs_full   = 1;
 }
 
+/* Allow a leaf action to request a full menu redraw when it returns.
+ * Call this before returning from an action that wrote to the LCD
+ * (e.g. action_counter, action_about) so the menu is restored. */
+void tsp_menu_request_redraw(void)
+{
+    g_needs_full = 1;
+}
+
 /*
  * Run one cycle of menu logic.
  * Returns 1 if back (KEY_PUSH) was pressed during this call.
@@ -105,18 +113,25 @@ uint8_t tsp_menu_run(void)
         }
     }
 
-    /* Confirm: S2 — execute action, then force full redraw */
+    /* Confirm: S2 — execute action callback.
+     * Reset g_needs_full before calling the action: if the action calls
+     * tsp_menu_switch() (submenu transition), it sets g_needs_full=1.
+     * Leaf actions leave it at 0 — no unnecessary clear or full redraw. */
     if (tsp_key_pressed(KEY_S2)) {
         if (g_items[g_cursor].action != NULL) {
-            /* Clear full screen so action starts with a clean workspace */
-            for (i = 0; i < 8; i++) {
-                tsp_tft18_show_str_color(0, i,
-                                         (uint8_t *)MENU_BLANK_STR,
-                                         MENU_FG_COLOR, MENU_BG_COLOR);
-            }
+            g_needs_full = 0;
             g_items[g_cursor].action();
-            /* Action may have overwritten LCD rows — need full redraw */
-            g_needs_full = 1;
+
+            if (g_needs_full) {
+                /* Submenu transition: clear screen before redrawing */
+                for (i = 0; i < 8; i++) {
+                    tsp_tft18_show_str_color(0, i,
+                                             (uint8_t *)MENU_BLANK_STR,
+                                             MENU_FG_COLOR, MENU_BG_COLOR);
+                }
+            }
+            /* Leaf action: menu stays intact. Action callback is
+             * responsible for cleaning up its own LCD output. */
         }
     }
 

@@ -6,7 +6,7 @@
 /* ===== UART Communication Module for MSPM0G3519 =====
  * Adapted from HSP hsp_uart.c ring-buffer + printf redirect pattern.
  *
- * Hardware: UART0 on PA10(RX) / PA11(TX), 115200-8N1 default.
+ * Hardware: UART0 on PA10(TX) / PA11(RX), 115200-8N1 default.
  * If different pins are needed, modify tsp_uart_init().
  *
  * Features:

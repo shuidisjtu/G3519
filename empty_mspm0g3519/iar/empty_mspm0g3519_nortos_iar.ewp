@@ -1134,8 +1134,32 @@
         <file>
             <name>$PROJ_DIR$\mspm0g3519.icf</name>
         </file>
+    </group>
+    <group>
+        <name>NUEDC2025</name>
         <file>
-            <name>$PROJ_DIR$\README.md</name>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_encoder.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_encoder.h</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_isr.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_isr.h</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_key.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_key.h</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_uart.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_uart.h</name>
         </file>
     </group>
     <group>
@@ -1151,45 +1175,18 @@
         </file>
     </group>
     <group>
-        <name>NUEDC2025</name>
-        <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_isr.c</name>
-        </file>
-        <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_isr.h</name>
-        </file>
-        <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_key.c</name>
-        </file>
-        <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_key.h</name>
-        </file>
-        <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_encoder.c</name>
-        </file>
-        <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_encoder.h</name>
-        </file>
-        <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_uart.c</name>
-        </file>
-        <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_uart.h</name>
-        </file>
-    </group>
-    <group>
         <name>TSP3519</name>
+        <file>
+            <name>$PROJ_DIR$\..\TSP3519\tsp_ccd.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\TSP3519\tsp_ccd.h</name>
+        </file>
         <file>
             <name>$PROJ_DIR$\..\TSP3519\tsp_gpio.c</name>
         </file>
         <file>
             <name>$PROJ_DIR$\..\TSP3519\tsp_gpio.h</name>
-        </file>
-        <file>
-            <name>$PROJ_DIR$\..\TSP3519\TSP_TFT18.c</name>
-        </file>
-        <file>
-            <name>$PROJ_DIR$\..\TSP3519\TSP_TFT18.h</name>
         </file>
         <file>
             <name>$PROJ_DIR$\..\TSP3519\tsp_menu.c</name>
@@ -1198,10 +1195,10 @@
             <name>$PROJ_DIR$\..\TSP3519\tsp_menu.h</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\TSP3519\tsp_ccd.c</name>
+            <name>$PROJ_DIR$\..\TSP3519\TSP_TFT18.c</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\TSP3519\tsp_ccd.h</name>
+            <name>$PROJ_DIR$\..\TSP3519\TSP_TFT18.h</name>
         </file>
     </group>
     <file>

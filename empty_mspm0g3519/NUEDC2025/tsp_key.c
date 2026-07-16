@@ -13,14 +13,21 @@ typedef struct {
 
 static key_ctx_t g_keys[KEY_NUM];
 
-/* Map key code -> GPIO read function */
+/*
+ * Map key code -> normalized GPIO read (1 = pressed, 0 = released).
+ *
+ * S0  (PA18): 47kΩ pull-down on main board → active HIGH.
+ * S1  (PC0) : 10kΩ pull-up  on expansion board → active LOW.
+ * S2  (PA16): 10kΩ pull-up  on expansion board → active LOW.
+ * PUSH(PA12): 10kΩ pull-up  on expansion board → active LOW.
+ */
 static uint8_t key_read(uint8_t key)
 {
     switch (key) {
-        case KEY_S0:   return (S0() != 0) ? 1 : 0;
-        case KEY_S1:   return (S1() != 0) ? 1 : 0;
-        case KEY_S2:   return (S2() != 0) ? 1 : 0;
-        case KEY_PUSH: return (PUSH() != 0) ? 1 : 0;
+        case KEY_S0:   return (S0() != 0) ? 1 : 0;    /* active HIGH */
+        case KEY_S1:   return (S1() == 0) ? 1 : 0;    /* active LOW  */
+        case KEY_S2:   return (S2() == 0) ? 1 : 0;    /* active LOW  */
+        case KEY_PUSH: return (PUSH() == 0) ? 1 : 0;   /* active LOW  */
         default:       return 0;
     }
 }
