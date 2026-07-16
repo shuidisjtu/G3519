@@ -1,12 +1,25 @@
 # CLAUDE.md
 
-给 Claude Code 的编程参考。环境搭建、构建步骤、已知问题等见 `empty_mspm0g3519/iar/README.md`。
+给 Claude Code 的编程参考。环境搭建、构建步骤、已知问题等见根目录 `README.md`。
+
+## ⚠️ 开发首要规则：SysConfig 先行
+
+在开发**任何**新功能/模块之前，必须按以下顺序操作：
+
+1. **阅读 `empty_mspm0g3519/docs/` 中相关硬件文档**（引脚约束、电源域、时钟限制）
+2. **查阅 SDK 官方例程**的 `.syscfg` 配置（路径 `C:\ti\mspm0_sdk_2_10_00_04\examples\`）
+3. **在 `.syscfg` 中添加外设模块**，确认引脚/时钟源/电源域配置正确
+4. **向用户求证** SysConfig 配置是否正确，用户确认后才能继续
+5. 重新生成 `ti_msp_dl_config.c/.h`（可用 SysConfig CLI 或 IAR 自动触发）
+6. 最后才写应用代码
+
+> **反例**：UART0 调试时跳过 SysConfig 手动配置 BUSCLK (80MHz) 时钟源，忽略了 UART0 是 PD0 外设（最大 40MHz），导致波特率错误 + 中断风暴。正确做法是先读 `docs/M0G3519_UART_Use.md` 和 SDK `uart_echo_interrupts_standby` 例程，在 SysConfig 中用 MFCLK (4MHz)，再向用户确认。
 
 ## 项目概述
 
 MSPM0G3519 电赛基础平台（NUEDC-2026 SAIS@SJTU）。主控 TI `MSPM0G3519SPZR`（Cortex-M0+, 80MHz），IAR EWARM 9.60.3 + DAPLink。
 
-工程入口：`empty_mspm0g3519/iar/empty_mspm0g3519.c`（开机动画 + 4 项交互菜单）。
+工程入口：`empty_mspm0g3519/iar/empty_mspm0g3519.c`。
 
 ## 工程结构
 

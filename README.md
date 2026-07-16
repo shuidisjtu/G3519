@@ -33,6 +33,10 @@
 | **调试器** | DAPLink (CMSIS-DAP v2, VID_0D28&PID_0204) |
 | **供电** | USB-C，禁止多路同时供电 |
 
+## 开发注意事项
+
+> **SysConfig 先行**：在开发任何新功能/模块之前，务必先在 `empty_mspm0g3519.syscfg` 中正确配置对应外设（引脚、时钟源、电源域），重新生成 `ti_msp_dl_config.c/.h`，确认无误后再写应用代码。参考 `empty_mspm0g3519/docs/` 中的硬件文档和 SDK 官方例程。
+
 ## 开发环境要求
 
 | 工具 | 版本 | 说明 |
@@ -119,7 +123,7 @@ empty_mspm0g3519/
 │   ├── empty_mspm0g3519_nortos_iar.eww  ← IAR 工作区（双击打开）
 │   ├── empty_mspm0g3519_nortos_iar.ewp  ← IAR 工程文件
 │   ├── empty_mspm0g3519_nortos_iar.ipcf ← SysConfig 构建规则
-│   ├── empty_mspm0g3519.c           ← 主程序（开机动画 + 4项交互菜单）
+│   ├── empty_mspm0g3519.c           ← 主程序（开机动画 + 5项交互菜单）
 │   ├── empty_mspm0g3519.syscfg      ← SysConfig 引脚配置
 │   ├── mspm0g3519.icf               ← 链接脚本
 │   ├── ti_msp_dl_config.c/.h        ← SysConfig 生成（勿手动编辑）
