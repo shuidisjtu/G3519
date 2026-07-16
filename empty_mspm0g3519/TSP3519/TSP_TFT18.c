@@ -430,11 +430,11 @@ void tsp_tft18_show_int16_color(uint16_t x, uint16_t y, int16_t data, uint16_t f
     uint8_t i;
     if(data < 0)
     {
-        tsp_tft18_show_char(x, y*16, '-');
+        tsp_tft18_show_char_color(x, y*16, '-', fcolor, bcolor);
         data = -data;
     }
     else
-        tsp_tft18_show_char(x, y*16, ' ');
+        tsp_tft18_show_char_color(x, y*16, ' ', fcolor, bcolor);
 	
     a[0] = data/10000;
     a[1] = data/1000%10;
@@ -491,7 +491,7 @@ void tsp_tft18_show_uint16_color(uint16_t x, uint16_t y, uint16_t data, uint16_t
 
 void tsp_tft18_draw_line_h(uint16_t x_start, uint16_t y_start, uint16_t length, uint16_t color)
 {
-    uint8_t i = 0;
+    uint16_t i = 0;
 
     if(((x_start+length)>TFT_X_MAX) || (x_start>(TFT_X_MAX-1)) || (y_start>(TFT_Y_MAX-1)))
         return;
@@ -502,7 +502,7 @@ void tsp_tft18_draw_line_h(uint16_t x_start, uint16_t y_start, uint16_t length, 
 
 void tsp_tft18_draw_line_v(uint16_t x_start, uint16_t y_start, uint16_t length, uint16_t color)
 {
-    uint8_t i = 0;
+    uint16_t i = 0;
 
     if(((y_start+length)>TFT_Y_MAX) || (x_start>(TFT_X_MAX-1)) || (y_start>(TFT_Y_MAX-1)))
         return;
