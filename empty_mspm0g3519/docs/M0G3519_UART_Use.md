@@ -213,6 +213,15 @@ RX 中断触发
 | 波特率分频 | IBRD=2, FBRD=11（由 SDK 自动计算） |
 | PC 端 | DAPLink 虚拟串口 (COM11) |
 
+UART6（K230 视觉模块通道，2026-07-17 实测验证，详见 `K230_Vision_Module_Use.md`）：
+
+| 项目 | 配置 |
+|------|------|
+| UART 实例 | UART6 (PD1, 主 UART)，SysConfig 实例名 `UART_K230` |
+| 时钟源 | BUSCLK = 80 MHz |
+| 波特率 | 115200, 8N1, 无流控（IBRD=43, FBRD=26, OVS 16X） |
+| 引脚 | PC11 (TX) / PC10 (RX)，J11 排座 |
+
 ### 关键注意事项
 
 1. **UART0 在 PD0 域**，最大输入时钟 40 MHz。不可直接用 BUSCLK (80 MHz) 作为时钟源。

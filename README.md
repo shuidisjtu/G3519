@@ -4,7 +4,7 @@
 
 ## 功能概览
 
-启动后播放**开机动画**（色彩测试 → 启动信息 → LED 闪烁 + 蜂鸣器短响），然后进入 **TFT LCD 菜单界面**，支持 5 项交互功能：
+启动后播放**开机动画**（色彩测试 → 启动信息 → LED 闪烁 + 蜂鸣器短响），然后进入 **TFT LCD 菜单界面**，支持 6 项交互功能：
 
 | 菜单项 | 功能 |
 |---|---|
@@ -12,6 +12,7 @@
 | **Buzzer Test** | 蜂鸣器短响 80ms |
 | **Show Counter** | 计数器演示（4 键计数，PUSH 退出） |
 | **UART Test** | UART0 串口测试（TX / printf / RX 回显 + LCD 显示） |
+| **K230 Test** | K230 视觉模块测试（UART6/J11 接收 YbProtocol 帧，LCD 实时显示目标坐标） |
 | **About** | 显示 "NUEDC-2026 SAIS@SJTU" |
 
 按键角色：**S0**=上移、**S1**=下移、**S2**=确认、**PUSH**=返回
@@ -29,7 +30,7 @@
 | **按键** | S0(PA18)、S1(PC0)、S2(PA16)、PUSH(PA12) |
 | **编码器** | PHA0(PA14, 双边沿中断)、PHB0(PA15) |
 | **CCD** | TSL1401 双通道，SI/CLK GPIO + ADC0(PC2/PC3) |
-| **UART** | UART0 MFCLK 4MHz, 115200-8N1，PA10(TX)/PA11(RX) |
+| **UART** | UART0 调试：MFCLK 4MHz, 115200-8N1，PA10(TX)/PA11(RX)；UART6→K230：BUSCLK 80MHz, 115200，PC11(TX)/PC10(RX)，J11 |
 | **调试器** | DAPLink (CMSIS-DAP v2, VID_0D28&PID_0204) |
 | **供电** | USB-C，禁止多路同时供电 |
 
@@ -39,85 +40,28 @@
 >
 > **教程参考**：[立创·泰山派 TI MSPM0 系列教程](https://wiki.lckfb.com/zh-hans/ti-series/) 是良好的 MSPM0 开发引导和示例参考。**但该教程使用的开发板（梁山派/泰山派等）与本项目 G3519 硬件平台不配套**，其引脚定义、外设配置、时钟树等不可直接套用，必须以本项目 `docs/` 中的硬件文档和 `empty_mspm0g3519.syscfg` 配置为最终依据。
 >
-> **K230 视觉模块**：亚博 K230 视觉识别模块的对接方案（UART6/J11 接线、CanMV 用法、协议设计）见 [`docs/K230_Vision_Module_Use.md`](empty_mspm0g3519/docs/K230_Vision_Module_Use.md)（接线就绪，软件开发中）。
+> **K230 视觉模块**：亚博 K230 视觉识别模块对接（UART6/J11 接线、YbProtocol 协议、驱动/解析/菜单）见 [`docs/K230_Vision_Module_Use.md`](empty_mspm0g3519/docs/K230_Vision_Module_Use.md)。**链路已实测打通**（2026-07-17）。
 
-## 开发环境要求
+## 开发环境
 
-| 工具 | 版本 | 说明 |
-|------|------|------|
-| **IAR EWARM** | 9.60.3 | IDE + 编译器 + 调试器 |
-| **TI MSPM0 SDK** | 2.10.00.04 | driverlib、启动文件、SysConfig、示例 |
-| **SysConfig** | 1.28.0 | 引脚/外设图形化配置工具 |
+| 工具 | 版本 |
+|------|------|
+| **IAR EWARM** | 9.60.3 |
+| **TI MSPM0 SDK** | 2.10.00.04（默认 `C:\ti\mspm0_sdk_2_10_00_04`） |
+| **SysConfig** | 1.28.0 |
 
-## 环境搭建（首次使用）
+首次配置仅两个关键点（其余安装均为默认下一步，踩坑见「已知问题」）：
 
-### 1. 安装 IAR EWARM
+1. **IAR 全局变量**：`Tools → Configure Custom Argument Variables` → **Global** 选项卡（勿放 TI 组）添加
+   `MSPM0_SDK_INSTALL_DIR` = SDK 路径、`SYSCONFIG_ROOT` = SysConfig 路径
+2. **Flash loader 修复**（仅 DAPLink 需要）：`<IAR>\arm\config\flashloader\TexasInstruments\FlashMSPM0GX51X.mac` 第 63 行附近改为
+   `} else if(__driverType("ijet") || __driverType("cmsisdap")) {`
 
-确保 IAR EWARM 9.60.3 已安装。其他 9.x 版本理论上也可用，但未经验证。
+## 编译与烧录
 
-### 2. 安装 TI MSPM0 SDK
+双击 `empty_mspm0g3519_nortos_iar.eww` → 确认 `Project → Options → Debugger → Driver` = **CMSIS-DAP**（SWD、1000kHz、Hardware Reset）→ `F7` 编译 → `Ctrl+D` 烧录调试 → `F5` 运行。
 
-从 TI 官网下载安装 [MSPM0 SDK 2.10.00.04](https://www.ti.com/tool/MSPM0-SDK)，记录安装路径（默认 `C:\ti\mspm0_sdk_2_10_00_04`）。
-
-### 3. 安装 SysConfig
-
-从 TI 下载 [SysConfig 1.28.0](https://www.ti.com/tool/SYSCONFIG)，记录安装路径。
-
-> 如果你已安装 TI Code Composer Studio (CCS)，其中包含 SysConfig，路径类似 `D:\ti\ccs2100\ccs\utils\sysconfig_1.28.0`。
-
-### 4. 配置 IAR 全局变量
-
-在 IAR 中设置两个全局自定义参数变量：
-
-1. 打开 IAR → `Tools` → `Configure Custom Argument Variables...`
-2. 切换到 `Global` 选项卡
-3. 添加以下变量（**必须在 Global 下，不要放在 TI 组**）：
-
-| 变量名 | 值（根据你的实际路径调整） |
-|--------|---------------------------|
-| `MSPM0_SDK_INSTALL_DIR` | `C:\ti\mspm0_sdk_2_10_00_04` |
-| `SYSCONFIG_ROOT` | `C:\ti\sysconfig_1.28.0` |
-
-### 5. 修复 Flash Loader（仅使用 DAPLink 时需要）
-
-TI 官方的 Flash loader 默认只支持 XDS 和 I-jet 调试器。使用 DAPLink 需要手动添加 CMSIS-DAP 分支：
-
-1. 找到文件（根据你的 IAR 安装路径调整）：
-   ```
-   <IAR安装目录>\arm\config\flashloader\TexasInstruments\FlashMSPM0GX51X.mac
-   ```
-2. 在第 63 行附近，找到：
-   ```c
-   } else if(__driverType("ijet")) {
-   ```
-3. 修改为：
-   ```c
-   } else if(__driverType("ijet") || __driverType("cmsisdap")) {
-   ```
-
-> 如果不做此修复，烧录时会报 **"Device ID mismatch"** 错误。
-
-## 打开与编译
-
-1. 双击 `empty_mspm0g3519_nortos_iar.eww` 打开 IAR 工作区
-2. 确认调试器驱动选择为 **CMSIS-DAP**：`Project` → `Options` → `Debugger` → `Driver`
-3. 编译：`Project` → `Rebuild All`（`F7`）
-
-## 烧录与调试
-
-1. 连接 DAPLink，确保目标板上电
-2. `Project` → `Download and Debug`（绿色三角 `Ctrl+D`）
-3. 点击 `Go`（`F5`）运行程序
-4. 开机动画（色彩测试 → 启动信息 → LED 闪烁 + 蜂鸣器），然后进入菜单
-
-### 调试器配置
-
-| 参数 | 值 |
-|------|-----|
-| 驱动 | CMSIS-DAP |
-| 接口 | SWD |
-| 速度 | 1000 kHz（不稳定时降为 100 kHz） |
-| Reset | Hardware Reset（需接 RST 线） |
+命令行编译：`iarbuild.exe empty_mspm0g3519_nortos_iar.ewp -build Debug`
 
 ## 工程结构
 
@@ -143,8 +87,13 @@ empty_mspm0g3519/
     ├── tsp_isr.h / tsp_isr.c         ← SysTick 延时 + GROUP1/UART0 中断分发
     ├── tsp_key.h / tsp_key.c         ← 4键扫描（20ms 消抖，边沿检测）
     ├── tsp_encoder.h / tsp_encoder.c ← 编码器驱动（PHA0 中断正交解码）
-    └── tsp_uart.h / tsp_uart.c       ← UART0 通信（MFCLK 4MHz, 环形缓冲 RX, printf 重定向）
+    ├── tsp_uart.h / tsp_uart.c       ← UART0 通信（MFCLK 4MHz, 环形缓冲 RX, printf 重定向）
+    ├── tsp_uart_k230.h / tsp_uart_k230.c ← UART6 驱动（K230, BUSCLK 80MHz, 环形缓冲 RX）
+    └── tsp_k230.h / tsp_k230.c       ← K230 YbProtocol 解析（主循环状态机断帧）
 ```
+
+K230 侧 MicroPython 脚本位于 `empty_mspm0g3519/k230_scripts/`（CanMV IDE 中打开运行）：
+`k230_link_test.py` = G3519↔K230 链路测试（模拟颜色帧，无需亚博 GUI）。
 
 ## 已知问题
 

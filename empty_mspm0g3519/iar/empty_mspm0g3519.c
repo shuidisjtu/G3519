@@ -6,6 +6,8 @@
 #include "tsp_menu.h"
 #include "tsp_encoder.h"
 #include "tsp_uart.h"
+#include "tsp_uart_k230.h"
+#include "tsp_k230.h"
 #include <stdio.h>
 
 /* ===== Global state ===== */
@@ -214,13 +216,71 @@ static void action_uart_test(void)
 	tsp_menu_request_redraw();
 }
 
-/* ===== Main Menu (5 items) ===== */
+/* ===== K230 Vision Test ===== */
+
+static void action_k230_test(void)
+{
+	uint8_t i;
+	k230_target_t tgt;
+
+	for (i = 1; i < 8; i++) {
+		tsp_tft18_show_str_color(0, i, (uint8_t *)"                    ", WHITE, BLACK);
+	}
+
+	tsp_tft18_show_str_color(0, 1, (uint8_t *)"K230 Test (UART6)", YELLOW, BLACK);
+	tsp_tft18_show_str_color(0, 2, (uint8_t *)"ID:      Frm:", WHITE, BLACK);
+	tsp_tft18_show_str_color(0, 3, (uint8_t *)"X:       Y:", WHITE, BLACK);
+	tsp_tft18_show_str_color(0, 4, (uint8_t *)"W:       H:", WHITE, BLACK);
+	tsp_tft18_show_str_color(0, 5, (uint8_t *)"MSG:", WHITE, BLACK);
+	tsp_tft18_show_str_color(0, 6, (uint8_t *)"Err:", WHITE, BLACK);
+	tsp_tft18_show_str_color(0, 7, (uint8_t *)"PUSH to exit", CYAN, BLACK);
+
+	/* Reset parser, start receiving from K230 (open a GUI demo on it) */
+	tsp_k230_init();
+	tsp_uart_k230_flush_rx();
+	tsp_uart_k230_rx_enable();
+
+	while (1) {
+		tsp_key_scan();
+		if (tsp_key_pressed(KEY_PUSH)) break;
+
+		/* Consume ring buffer, parse YbProtocol frames (main-loop context) */
+		tsp_k230_task();
+
+		if (tsp_k230_get_target(&tgt)) {
+			char disp[16];
+			uint8_t n = 0;
+
+			tsp_tft18_show_uint16(24,  2, tgt.func_id);
+			tsp_tft18_show_uint16(104, 2, (uint16_t)tsp_k230_frame_count());
+			tsp_tft18_show_int16(24,  3, tgt.x);
+			tsp_tft18_show_int16(96,  3, tgt.y);
+			tsp_tft18_show_int16(24,  4, tgt.w);
+			tsp_tft18_show_int16(96,  4, tgt.h);
+			tsp_tft18_show_uint16(32, 6, (uint16_t)tsp_k230_error_count());
+
+			/* MSG field: pad to fixed width to clear stale chars */
+			while (n < 15 && tgt.msg[n]) { disp[n] = tgt.msg[n]; n++; }
+			while (n < 15) { disp[n++] = ' '; }
+			disp[15] = '\0';
+			tsp_tft18_show_str_color(40, 5, (uint8_t *)disp, GREEN, BLACK);
+		}
+
+		delay_1ms(5);
+	}
+
+	tsp_uart_k230_rx_disable();
+	tsp_menu_request_redraw();
+}
+
+/* ===== Main Menu (6 items) ===== */
 
 static tsp_menu_item_t main_menu[] = {
 	{"LED Menu",      action_enter_led},
 	{"Buzzer Test",   action_buzzer},
 	{"Show Counter",  action_counter},
 	{"UART Test",     action_uart_test},
+	{"K230 Test",     action_k230_test},
 	{"About",         action_about},
 };
 
@@ -243,6 +303,11 @@ int main(void)
 	/* Init UART0: 115200-8N1, BUSCLK/2=40MHz (PD0 max), OVS auto-select */
 	tsp_uart_init(115200);
 	tsp_uart_send_string("MSPM0G3519 booted\r\n");
+
+	/* Init UART6 for K230 vision module (J11, BUSCLK 80MHz, 115200 preset).
+	 * RX interrupt stays off until K230 Test enables it on demand. */
+	tsp_uart_k230_init();
+	tsp_k230_init();
 
 	tsp_key_init();
 	tsp_menu_init("=== NUEDC 2026 ===", main_menu, MAIN_MENU_COUNT);

@@ -1,6 +1,6 @@
 # K230 视觉模块对接指南
 
-版本：V1.2（轻量化）。接线与环境已就绪，G3519 侧软件实施须按「SysConfig 先行」规则（见 §4）。
+版本：V1.3。**链路已实测打通**（2026-07-17：`k230_link_test.py` 模拟帧 20Hz，K230 Test 页面 Frm 递增、Err=0）。G3519 侧驱动/协议解析/菜单已实装（见 §4）。
 
 ## 1. 结论速览
 
@@ -10,7 +10,7 @@
 | G3519 侧 | **J11 排座 / UART6**（TX=PC11，RX=PC10），PD1 电源域，时钟用 BUSCLK 80MHz |
 | K230 侧 | 亚博固件固定 **UART1**（FPIOA pin9=TXD、pin10=RXD），封装见 `k230_firmware_ref/YbUart.py` |
 | 数据方向 | K230 → G3519：GUI 识别案例**开箱即发 YbProtocol ASCII 帧**（§3.1）；G3519 → K230：原厂固件无接收处理，需自写脚本 |
-| 供电 | K230 用自身 USB 独立供电，与主板**只连 TX/RX/GND 三根线**；严禁 J11 的 5V 与模块 USB 同时供电 |
+| 供电 | 两种方式均可且**可同时接**（J11 5V 经肖特基隔离，USB 端电压略高时二极管截止防倒灌）：① 联调时 K230 接 USB（IDE 通信必须）；② 脱机运行时可由 J11 1 脚 5V 直接供电（略低于 5V，可支撑 K230 正常工作，老师确认的设计意图） |
 
 ## 2. 硬件接线（已完成，供核对）
 
@@ -18,7 +18,7 @@ J11 针脚定义已按主板电路图实查核对（2026-07-17）：
 
 | J11 针脚 | 信号 | MCU GPIO | 接 K230 |
 |---:|---|---|---|
-| 1 | ~5V（二极管隔离） | - | 不接 |
+| 1 | ~5V（肖特基隔离） | - | K230 5V（可选：脱机时由主板供电；与 K230 USB 同接安全） |
 | 2 | GND | - | GND |
 | 3 | UART6-RX | PC10（物理脚 87） | ← K230 TX |
 | 4 | UART6-TX | PC11（物理脚 88） | → K230 RX |
@@ -67,46 +67,30 @@ $LL,FF,xxx,yyy,www,hhh[,MSG[,VVV]]#\n
 
 CHECKSUM = TYPE+LEN+PAYLOAD 逐字节求和取低 8 位；PAYLOAD 小端（如 int16 x/y/w/h）。115200 下 13 字节帧 @50Hz 仅占用波特率 ~6%。
 
-## 4. G3519 侧实现路线
+## 4. G3519 侧实现（已完成）
 
-严格按「SysConfig 先行」流程：
-
-1. **`.syscfg` 新增 UART 实例**：UART6，时钟源 BUSCLK，TX=PC11 / RX=PC10，115200-8N1；参考 SDK 例程 `uart_echo_interrupts_standby` 的 `.syscfg` 写法（`C:\ti\mspm0_sdk_2_10_00_04\examples\`）。
-2. **向用户确认配置** 后重新生成 `ti_msp_dl_config.c/.h`。
-3. **驱动层**：现有 `NUEDC2025/tsp_uart.c` 为 UART0 单例（实例宏集中在文件顶部），不可直接复用。两个方案：
-   - 新建 `tsp_uart_k230.c/.h`（复制环形缓冲结构，实例指向 UART6）——改动最小；
-   - 或将 `tsp_uart` 泛化为多实例（结构体持有 `UART_Regs*` + 独立缓冲）——更干净，改动大。
-4. **中断分发**：`NUEDC2025/tsp_isr.c` 新增 `UART6_IRQHandler`（UART 各有独立向量，不走 GROUP1）。
-5. **协议解析层**：新建 `tsp_k230.c/.h`，实现 §3.1 帧格式的状态机解析，对外提供 `tsp_k230_get_target()` 之类接口。
-6. **菜单集成**：`tsp_menu` 新增「K230 Test」项，LCD 实时显示收到的坐标，便于联调。
-7. printf 重定向保持指向 UART0（调试口），与 K230 通道互不干扰。
-
-### 4.1 亚博官方 MCU 例程参考（本地 `01_k230_color_detect/`，不入库）
-
-亚博为 MSPM0**G3507** 提供的 CCS 例程，存放于 `empty_mspm0g3519/01_k230_color_detect/`（已 `.gitignore`）。
-
-**可移植**：`APP/yb_protocol.c/.h` 的解析状态机（帧头 `0x24`/帧尾 `0x23` 断帧 → 逗号分割 `atoi` → LL 校验 → 功能 ID 过滤），可改造为 `tsp_k230.c`；其 `pto_len == num` 校验实证 LL 可用（`#` 即成帧，`\n` 不入缓冲）。
-
-**不可照抄**：
-
-| 项目 | 例程 (G3507) | 本项目 (G3519) |
+| 层 | 文件 | 说明 |
 |---|---|---|
-| `.syscfg` | SDK 2.02、LQFP-64 | SDK 2.10、LQFP-100，必须自建 |
-| K230 串口 | UART2 @ PA21/PA22（**G3519 没有 UART2**） | UART6 @ PC10/PC11 (J11) |
-| 工程/IDE | CCS | IAR EWARM |
-| printf 重定向 | Keil 风格 `fputc` | IAR `__write`（`tsp_uart.c` 已有） |
+| SysConfig | `iar/empty_mspm0g3519.syscfg` | `UART_K230` 实例：UART6、BUSCLK、PC11(TX)/PC10(RX)、115200-8N1（IBRD=43/FBRD=26，偏差 0.008%） |
+| 驱动 | `NUEDC2025/tsp_uart_k230.c/.h` | 256B 环形缓冲 RX；`rx_enable/disable` 按需开关（同 UART0 策略） |
+| 中断 | `NUEDC2025/tsp_isr.c` | `UART6_IRQHandler` → 只入队，不解析 |
+| 协议 | `NUEDC2025/tsp_k230.c/.h` | `$...#` 状态机断帧（主循环 `tsp_k230_task()`），`tsp_k230_get_target()` 查询最新目标，帧/错帧计数 |
+| 菜单 | `iar/empty_mspm0g3519.c` | 「K230 Test」页：实时显示 ID/X/Y/W/H/MSG/Frm/Err，PUSH 退出自动关 RX |
 
-**⚠️ 例程坏实践，移植时必须修正**：`usart.c:146-166` 在 RX 中断里直接整帧解析 + `sprintf` + 阻塞回显。本项目必须保持「**ISR 只入环形缓冲，主循环消费解析**」架构（同 `tsp_uart.c`），解析结果存最新目标供查询，不在中断里 printf。
+架构原则：**ISR 只入环形缓冲，解析在主循环**；printf 仍走 UART0 调试口，与 K230 通道互不干扰。API 用法见项目 `CLAUDE.md` 速查。
+
+> 本地 `01_k230_color_detect/`（亚博 G3507 CCS 例程，已 .gitignore）仅作协议参考，其 ISR 内解析 + printf 的写法勿模仿；G3507 syscfg/引脚不适用本板。
 
 ## 5. K230 侧要点
 
-- 方案 A 无需写任何 K230 代码，GUI 打开识别案例即发数据。
-- 自写脚本时：`from ybUtils.YbUart import YbUart` 复用固件封装（UART1@pin9/10 已配好）；写完在 CanMV IDE 中 `工具 → 保存为 main.py`，脚本随开机自启，**脱离 PC 前必须做这一步**。
+- **链路测试脚本**：`k230_scripts/k230_link_test.py`（自包含，不依赖亚博库）。两种跑法：① CanMV IDE 临时「运行」（需接 USB，改脚本方便）；② `工具 → 保存为 main.py` 后拔 USB，J11 四线（5V/GND/RX/TX）供电脱机自启。
+- **方案 A（用原厂识别功能）的前提是亚博 GUI 固件在位**：GUI 打开识别案例即自动发数据。当前模块的 `main.py` 已被覆盖，需要时恢复原厂 `main.py`（本地 H:\ 有 SD 卡备份）或重烧亚博固件。
+- 自写脚本：亚博固件下可 `from ybUtils.YbUart import YbUart` 复用封装（UART1@pin9/10 已配好）；改完须「保存为 main.py」才能脱机自启。
 - 勿烧录第三方 K230 固件（亚博官方提示外设可能不兼容）。
 
 ## 6. 调试排查清单
 
-1. **K230 独立自检**：GUI 打开任一识别案例，USB-TTL 接 K230 载板串口 TX/GND，PC 端 115200 应看到 `$..,..#` 帧。
+1. **K230 独立自检**：GUI 打开任一识别案例，USB-TTL 接 K230 载板串口 TX/GND，PC 端 115200 应看到 `$..,..#` 帧；若 GUI 已被覆盖/刷机，用 `k230_scripts/k230_link_test.py`（CanMV IDE 临时运行，模拟颜色帧，不依赖亚博库）。
 2. **G3519 独立自检**：UART6 配好后先做 PC10↔PC11 短接回环（参考 `M0G3519_UART_Use.md` §9.2）。
 3. **互连无数据**：检查交叉接线、共地、K230 脚本是否已「保存为 main.py」（脱机运行时）。
 4. **数据乱码**：核对双方波特率；确认 UART6 时钟源为 BUSCLK 且 SysConfig 生成的实例频率宏与实际一致。

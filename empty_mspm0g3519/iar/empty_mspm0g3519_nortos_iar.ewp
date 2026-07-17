@@ -1161,6 +1161,18 @@
         <file>
             <name>$PROJ_DIR$\..\NUEDC2025\tsp_uart.h</name>
         </file>
+        <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_uart_k230.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_uart_k230.h</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_k230.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_k230.h</name>
+        </file>
     </group>
     <group>
         <name>SysConfig Generated Files</name>

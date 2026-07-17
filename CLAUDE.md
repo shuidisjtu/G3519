@@ -37,10 +37,12 @@ empty_mspm0g3519/
 │   ├── tsp_ccd.h/.c                   ← TSL1401 线性 CCD（双通道，ADC0 软触发）[未启用]
 │   └── tsp_menu.h/.c                  ← LCD 菜单系统（列表+子菜单+增量重绘）
 └── NUEDC2025/                         ← 应用层驱动
-    ├── tsp_isr.h/.c                   ← SysTick 延时 + GROUP1 中断分发
+    ├── tsp_isr.h/.c                   ← SysTick 延时 + GROUP1/UART0/UART6 中断分发
     ├── tsp_key.h/.c                   ← 4 键扫描（20ms 消抖，边沿检测）
     ├── tsp_encoder.h/.c               ← 编码器（PHA0 中断正交解码，20ms 速度）
-    └── tsp_uart.h/.c                  ← UART0（MFCLK 4MHz, 115200-8N1, 环形缓冲 RX）
+    ├── tsp_uart.h/.c                  ← UART0（MFCLK 4MHz, 115200-8N1, 环形缓冲 RX）
+    ├── tsp_uart_k230.h/.c             ← UART6（K230, BUSCLK 80MHz, 115200, 环形缓冲 RX）
+    └── tsp_k230.h/.c                  ← K230 YbProtocol 解析（主循环状态机, $...# 断帧）
 ```
 
 ## 关键硬件约束
@@ -65,6 +67,7 @@ empty_mspm0g3519/
 | CCD | PC9(SI1), PB20(CLK1), PC4(SI2), PC5(CLK2) | `CCD_SI1/CLK1/SI2/CLK2` |
 | 电源控制 | PB1(SLEEP), PA7(FAULT) | `SLEEP_HIGH/LOW`, `FAULT()` |
 | UART0 | PA10(TX), PA11(RX) | IOMUX_PINCM21/22 |
+| UART6 (K230) | PC11(TX), PC10(RX)，J11 排座 | `UART_K230_INST`（SysConfig 宏） |
 | CCD ADC | PC2(CH12-CCD1), PC3(CH13-CCD2) | ADC0 手动配置 |
 
 ## API 速查
@@ -76,6 +79,8 @@ tsp_tft18_init();                      // LCD
 boot_animation();                      // 开机动画（色彩测试+启动信息+蜂鸣器）
 tsp_encoder_init();                    // 编码器（默认禁用 PHA0 中断）
 tsp_uart_init(115200);                  // UART0（SysConfig 预设 MFCLK 4MHz 时钟）
+tsp_uart_k230_init();                   // UART6→K230（SysConfig 已定 115200，RX 按需开）
+tsp_k230_init();                        // K230 协议解析器复位
 // tsp_ccd_init();                     // CCD [未启用，无外接模块]
 tsp_key_init();                        // 按键
 tsp_menu_init(title, items, count);    // 菜单
@@ -115,6 +120,14 @@ printf("val=%d\n", x);                 // 已重定向到 UART0
 if (tsp_uart_available()) { uint8_t ch = tsp_uart_read_byte(); }
 tsp_uart_rx_enable();                   // 按需开启 RX 中断（防止浮空噪声风暴）
 tsp_uart_rx_disable();                  // 用完后关闭 RX 中断
+
+// ===== K230 视觉模块（tsp_uart_k230.c + tsp_k230.c，UART6/J11） =====
+tsp_uart_k230_rx_enable();              // 进入使用场景时开启接收
+tsp_k230_task();                        // 主循环调用：消费环形缓冲 + 解析 YbProtocol
+k230_target_t t;
+if (tsp_k230_get_target(&t)) { ... }    // 有新帧返回 1: t.func_id/x/y/w/h/msg
+tsp_k230_frame_count();                 // 成功帧计数（错误帧见 error_count）
+tsp_uart_k230_rx_disable();             // 退出场景时关闭
 
 // ===== CCD（tsp_ccd.c） =====
 ccd_data_t pixels;                     // uint16_t[128]

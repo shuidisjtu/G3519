@@ -44,7 +44,7 @@ $RECYCLE.BIN/
 .claude/
 
 # === Local Reference Only (not tracked) ===
-# 亚博官方 MSPM0G3507 CCS 例程，仅本地参考，见 docs/K230_Vision_Module_Use.md §4.1
+# 亚博官方 MSPM0G3507 CCS 例程，仅本地参考，见 docs/K230_Vision_Module_Use.md §4
 empty_mspm0g3519/01_k230_color_detect/
 
 # === Editor / IDE ===

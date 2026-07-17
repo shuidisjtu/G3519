@@ -110,6 +110,22 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 #define UART_0_BAUD_RATE                                                  (9600)
 #define UART_0_IBRD_4_MHZ_9600_BAUD                                         (26)
 #define UART_0_FBRD_4_MHZ_9600_BAUD                                          (3)
+/* Defines for UART_K230 */
+#define UART_K230_INST                                                     UART6
+#define UART_K230_INST_FREQUENCY                                        80000000
+#define UART_K230_INST_IRQHandler                               UART6_IRQHandler
+#define UART_K230_INST_INT_IRQN                                   UART6_INT_IRQn
+#define GPIO_UART_K230_RX_PORT                                             GPIOC
+#define GPIO_UART_K230_TX_PORT                                             GPIOC
+#define GPIO_UART_K230_RX_PIN                                     DL_GPIO_PIN_10
+#define GPIO_UART_K230_TX_PIN                                     DL_GPIO_PIN_11
+#define GPIO_UART_K230_IOMUX_RX                                  (IOMUX_PINCM88)
+#define GPIO_UART_K230_IOMUX_TX                                  (IOMUX_PINCM89)
+#define GPIO_UART_K230_IOMUX_RX_FUNC                   IOMUX_PINCM88_PF_UART6_RX
+#define GPIO_UART_K230_IOMUX_TX_FUNC                   IOMUX_PINCM89_PF_UART6_TX
+#define UART_K230_BAUD_RATE                                             (115200)
+#define UART_K230_IBRD_80_MHZ_115200_BAUD                                   (43)
+#define UART_K230_FBRD_80_MHZ_115200_BAUD                                   (26)
 
 
 
@@ -214,6 +230,7 @@ void SYSCFG_DL_SYSCTL_init(void);
 
 bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 void SYSCFG_DL_UART_0_init(void);
+void SYSCFG_DL_UART_K230_init(void);
 void SYSCFG_DL_LCD_init(void);
 
 void SYSCFG_DL_SYSTICK_init(void);

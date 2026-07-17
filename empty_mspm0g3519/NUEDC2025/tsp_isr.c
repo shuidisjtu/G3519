@@ -1,6 +1,7 @@
 #include "tsp_isr.h"
 #include "tsp_encoder.h"
 #include "tsp_uart.h"
+#include "tsp_uart_k230.h"
 
 volatile uint32_t sys_tick_counter = 0;
 volatile static uint32_t delay;
@@ -53,4 +54,13 @@ void GROUP1_IRQHandler(void)
 void UART0_IRQHandler(void)
 {
     tsp_uart_isr();
+}
+
+/* ================================================================
+ * UART6_IRQHandler — RX interrupt for K230 vision module (J11)
+ * ISR only enqueues into ring buffer; parsing is in the main loop.
+ * ================================================================ */
+void UART6_IRQHandler(void)
+{
+    tsp_uart_k230_isr();
 }
