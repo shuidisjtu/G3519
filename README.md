@@ -39,7 +39,7 @@
 >
 > **教程参考**：[立创·泰山派 TI MSPM0 系列教程](https://wiki.lckfb.com/zh-hans/ti-series/) 是良好的 MSPM0 开发引导和示例参考。**但该教程使用的开发板（梁山派/泰山派等）与本项目 G3519 硬件平台不配套**，其引脚定义、外设配置、时钟树等不可直接套用，必须以本项目 `docs/` 中的硬件文档和 `empty_mspm0g3519.syscfg` 配置为最终依据。
 >
-> **K230 视觉模块**：亚博 K230 视觉识别模块的对接方案（UART6/J11 接线、CanMV 用法、协议设计）见 [`docs/K230_Vision_Module_Use.md`](empty_mspm0g3519/docs/K230_Vision_Module_Use.md)（规划中，未实施）。
+> **K230 视觉模块**：亚博 K230 视觉识别模块的对接方案（UART6/J11 接线、CanMV 用法、协议设计）见 [`docs/K230_Vision_Module_Use.md`](empty_mspm0g3519/docs/K230_Vision_Module_Use.md)（接线就绪，软件开发中）。
 
 ## 开发环境要求
 
