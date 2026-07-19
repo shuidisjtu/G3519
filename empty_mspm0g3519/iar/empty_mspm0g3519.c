@@ -103,59 +103,121 @@ static void action_uart_test(void)
 	tsp_menu_request_redraw();
 }
 
-/* ===== K230 Vision Test ===== */
+/* ===== K230 Vision Test (color tracking with LCD overlay) ===== */
 
 static void action_k230_test(void)
 {
-	uint8_t i;
 	k230_target_t tgt;
+	int16_t lcd_x, lcd_y, lcd_w, lcd_h;
+	int16_t old_x = 0, old_y = 0, old_w = 0, old_h = 0;
+	int16_t last_disp_x = -1, last_disp_y = -1;
+	uint16_t last_fc = 0xFFFF, last_ec = 0xFFFF;
+	uint8_t has_old = 0, showed_x = 0;
 
-	for (i = 1; i < 8; i++) {
-		tsp_tft18_show_str_color(0, i, (uint8_t *)"                    ", WHITE, BLACK);
-	}
+	/* Full-screen tracking view */
+	tsp_tft18_clear(BLACK);
+	tsp_tft18_show_str_color(0, 0, (uint8_t *)"K230 Track", YELLOW, BLACK);
+	tsp_tft18_draw_line_h(0, 104, 160, BLUE);   /* divider y=104 */
 
-	tsp_tft18_show_str_color(0, 1, (uint8_t *)"K230 Test (UART6)", YELLOW, BLACK);
-	tsp_tft18_show_str_color(0, 2, (uint8_t *)"ID:      Frm:", WHITE, BLACK);
-	tsp_tft18_show_str_color(0, 3, (uint8_t *)"X:       Y:", WHITE, BLACK);
-	tsp_tft18_show_str_color(0, 4, (uint8_t *)"W:       H:", WHITE, BLACK);
-	tsp_tft18_show_str_color(0, 5, (uint8_t *)"MSG:", WHITE, BLACK);
-	tsp_tft18_show_str_color(0, 6, (uint8_t *)"Err:", WHITE, BLACK);
-	tsp_tft18_show_str_color(0, 7, (uint8_t *)"PUSH to exit", CYAN, BLACK);
+	/* Initial diagnostic: show we're waiting */
+	tsp_tft18_show_str_color(0, 6, (uint8_t *)"Waiting for K230...", CYAN, BLACK);
+	tsp_tft18_show_str_color(0, 7, (uint8_t *)"F:   0 E:   0", WHITE, BLACK);
 
-	/* Reset parser, start receiving from K230 (open a GUI demo on it) */
 	tsp_k230_init();
 	tsp_uart_k230_flush_rx();
 	tsp_uart_k230_rx_enable();
 
 	while (1) {
-		tsp_key_scan();
-		if (tsp_key_pressed(KEY_PUSH)) break;
+		/* Scan keys at 1ms intervals for responsive PUSH detection */
+		{
+			uint8_t i;
+			for (i = 0; i < 5; i++) {
+				tsp_key_scan();
+				if (tsp_key_pressed(KEY_PUSH)) goto exit_k230;
+				delay_1ms(1);
+			}
+		}
 
-		/* Consume ring buffer, parse YbProtocol frames (main-loop context) */
 		tsp_k230_task();
 
 		if (tsp_k230_get_target(&tgt)) {
-			char disp[16];
-			uint8_t n = 0;
+			/* Map K230 320x240 -> LCD 160x128: divide by 2 */
+			lcd_x = tgt.x / 2;
+			lcd_y = tgt.y / 2;
+			lcd_w = tgt.w / 2;
+			lcd_h = tgt.h / 2;
 
-			tsp_tft18_show_uint16(24,  2, tgt.func_id);
-			tsp_tft18_show_uint16(104, 2, (uint16_t)tsp_k230_frame_count());
-			tsp_tft18_show_int16(24,  3, tgt.x);
-			tsp_tft18_show_int16(96,  3, tgt.y);
-			tsp_tft18_show_int16(24,  4, tgt.w);
-			tsp_tft18_show_int16(96,  4, tgt.h);
-			tsp_tft18_show_uint16(32, 6, (uint16_t)tsp_k230_error_count());
+			/* Clamp to canvas (pixel y <= 103, x <= 159) */
+			if (lcd_x < 0) lcd_x = 0;
+			if (lcd_y < 0) lcd_y = 0;
+			if (lcd_x + lcd_w > 159) lcd_w = 159 - lcd_x;
+			if (lcd_y + lcd_h > 103) lcd_h = 103 - lcd_y;
+			if (lcd_w < 2) lcd_w = 2;
+			if (lcd_h < 2) lcd_h = 2;
 
-			/* MSG field: pad to fixed width to clear stale chars */
-			while (n < 15 && tgt.msg[n]) { disp[n] = tgt.msg[n]; n++; }
-			while (n < 15) { disp[n++] = ' '; }
-			disp[15] = '\0';
-			tsp_tft18_show_str_color(40, 5, (uint8_t *)disp, GREEN, BLACK);
+			/* Erase previous rect with BLACK */
+			if (has_old) {
+				tsp_tft18_draw_frame((uint8_t)old_x, (uint8_t)old_y,
+				                     (uint8_t)old_w, (uint8_t)old_h, BLACK);
+			}
+
+			/* Draw current rect in GREEN */
+			tsp_tft18_draw_frame((uint8_t)lcd_x, (uint8_t)lcd_y,
+			                     (uint8_t)lcd_w, (uint8_t)lcd_h, GREEN);
+
+			old_x = lcd_x; old_y = lcd_y;
+			old_w = lcd_w; old_h = lcd_h;
+			has_old = 1;
+
+			/* Update X/Y display (row 6) only when values change */
+			if (!showed_x || tgt.x != last_disp_x || tgt.y != last_disp_y) {
+				if (!showed_x) {
+					/* First frame: clear "Waiting" hint */
+					tsp_tft18_show_str_color(0, 6, (uint8_t *)"               ",
+					                         WHITE, BLACK);
+					showed_x = 1;
+				}
+				tsp_tft18_show_str_color(0, 6, (uint8_t *)"X:", WHITE, BLACK);
+				tsp_tft18_show_int16(16, 6, tgt.x);
+				tsp_tft18_show_str_color(56, 6, (uint8_t *)"Y:", WHITE, BLACK);
+				tsp_tft18_show_int16(72, 6, tgt.y);
+				last_disp_x = tgt.x;
+				last_disp_y = tgt.y;
+			}
 		}
 
-		delay_1ms(5);
+		/* Refresh F/E counters (row 7) only when values change */
+		{
+			uint16_t fc = (uint16_t)tsp_k230_frame_count();
+			uint16_t ec = (uint16_t)tsp_k230_error_count();
+
+			if (fc != last_fc || ec != last_ec) {
+				char buf[21];
+				uint8_t p = 0;
+
+				buf[p++] = 'F'; buf[p++] = ':';
+				buf[p++] = '0' + (fc / 1000) % 10;
+				buf[p++] = '0' + (fc / 100) % 10;
+				buf[p++] = '0' + (fc / 10) % 10;
+				buf[p++] = '0' + (fc % 10);
+				buf[p++] = ' ';
+				buf[p++] = 'E'; buf[p++] = ':';
+				buf[p++] = '0' + (ec / 1000) % 10;
+				buf[p++] = '0' + (ec / 100) % 10;
+				buf[p++] = '0' + (ec / 10) % 10;
+				buf[p++] = '0' + (ec % 10);
+				while (p < 20) buf[p++] = ' ';
+				buf[20] = '\0';
+
+				tsp_tft18_show_str_color(0, 7, (uint8_t *)buf, WHITE, BLACK);
+				last_fc = fc;
+				last_ec = ec;
+			}
+		}
+
 	}
 
+exit_k230:
 	tsp_uart_k230_rx_disable();
 	tsp_menu_request_redraw();
 }
