@@ -4,16 +4,14 @@
 
 ## 功能概览
 
-启动后播放**开机动画**（色彩测试 → 启动信息 → LED 闪烁 + 蜂鸣器短响），然后进入 **TFT LCD 菜单界面**，支持 6 项交互功能：
+启动后播放**开机动画**（色彩测试 → 启动信息 → LED 闪烁 + 蜂鸣器短响），然后进入 **TFT LCD 菜单界面**（2026-07-19 精简为 2 项）：
 
 | 菜单项 | 功能 |
 |---|---|
-| **LED Menu** | 子菜单：LED Toggle（翻转）/ LED Blink（~2Hz 背景闪烁） |
-| **Buzzer Test** | 蜂鸣器短响 80ms |
-| **Show Counter** | 计数器演示（4 键计数，PUSH 退出） |
 | **UART Test** | UART0 串口测试（TX / printf / RX 回显 + LCD 显示） |
-| **K230 Test** | K230 视觉模块测试（UART6/J11 接收 YbProtocol 帧，LCD 实时显示目标坐标） |
-| **About** | 显示 "NUEDC-2026 SAIS@SJTU" |
+| **K230 Test** | K230 视觉模块测试（UART6/J11 接收 YbProtocol 帧，LCD 实时显示目标坐标/色块追踪画框） |
+
+> LED、蜂鸣器、按键等基础 GPIO 功能已在开机动画中充分验证，不再单独列为菜单项。
 
 按键角色：**S0**=上移、**S1**=下移、**S2**=确认、**PUSH**=返回
 
@@ -71,7 +69,7 @@ empty_mspm0g3519/
 │   ├── empty_mspm0g3519_nortos_iar.eww  ← IAR 工作区（双击打开）
 │   ├── empty_mspm0g3519_nortos_iar.ewp  ← IAR 工程文件
 │   ├── empty_mspm0g3519_nortos_iar.ipcf ← SysConfig 构建规则
-│   ├── empty_mspm0g3519.c           ← 主程序（开机动画 + 5项交互菜单）
+│   ├── empty_mspm0g3519.c           ← 主程序（开机动画 + 菜单交互）
 │   ├── empty_mspm0g3519.syscfg      ← SysConfig 引脚配置
 │   ├── mspm0g3519.icf               ← 链接脚本
 │   ├── ti_msp_dl_config.c/.h        ← SysConfig 生成（勿手动编辑）
