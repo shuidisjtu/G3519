@@ -9,7 +9,7 @@
 | 菜单项 | 功能 |
 |---|---|
 | **UART Test** | UART0 串口测试（TX / printf / RX 回显 + LCD 显示） |
-| **K230 Test** | K230 视觉模块测试（UART6/J11 接收 YbProtocol 帧，LCD 实时显示目标坐标/色块追踪画框） |
+| **K230 Test** | K230 视觉模块测试（UART6/J11 双向通信：接收 YbProtocol 帧 + S0 发指令，LCD 色块追踪画框） |
 
 > LED、蜂鸣器、按键等基础 GPIO 功能已在开机动画中充分验证，不再单独列为菜单项。
 
@@ -38,7 +38,7 @@
 >
 > **教程参考**：[立创·泰山派 TI MSPM0 系列教程](https://wiki.lckfb.com/zh-hans/ti-series/) 是良好的 MSPM0 开发引导和示例参考。**但该教程使用的开发板（梁山派/泰山派等）与本项目 G3519 硬件平台不配套**，其引脚定义、外设配置、时钟树等不可直接套用，必须以本项目 `docs/` 中的硬件文档和 `empty_mspm0g3519.syscfg` 配置为最终依据。
 >
-> **K230 视觉模块**：亚博 K230 视觉识别模块对接（UART6/J11 接线、YbProtocol 协议、驱动/解析/菜单）见 [`docs/K230_Vision_Module_Use.md`](empty_mspm0g3519/docs/K230_Vision_Module_Use.md)。**链路已实测打通**（2026-07-17）。
+> **K230 视觉模块**：亚博 K230 视觉识别模块对接（UART6/J11 接线、YbProtocol 协议、双向通信、LCD 色块追踪画框）见 [`docs/K230_Vision_Module_Use.md`](empty_mspm0g3519/docs/K230_Vision_Module_Use.md)。**双向链路已实测打通**（2026-07-19）。
 
 ## 开发环境
 
@@ -91,7 +91,8 @@ empty_mspm0g3519/
 ```
 
 K230 侧 MicroPython 脚本位于 `empty_mspm0g3519/k230_scripts/`（CanMV IDE 中打开运行）：
-`k230_link_test.py` = G3519↔K230 链路测试（模拟颜色帧，无需亚博 GUI）。
+- `k230_link_test.py` = 单向链路测试（模拟颜色帧，无需亚博 GUI）
+- `k230_bidir_test.py` = 双向通信测试（S0 切换扫动/静止模式，自包含）
 
 ## 已知问题
 

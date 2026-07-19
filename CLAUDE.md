@@ -121,12 +121,13 @@ if (tsp_uart_available()) { uint8_t ch = tsp_uart_read_byte(); }
 tsp_uart_rx_enable();                   // 按需开启 RX 中断（防止浮空噪声风暴）
 tsp_uart_rx_disable();                  // 用完后关闭 RX 中断
 
-// ===== K230 视觉模块（tsp_uart_k230.c + tsp_k230.c，UART6/J11） =====
+// ===== K230 视觉模块（tsp_uart_k230.c + tsp_k230.c，UART6/J11，双向已验证） =====
 tsp_uart_k230_rx_enable();              // 进入使用场景时开启接收
 tsp_k230_task();                        // 主循环调用：消费环形缓冲 + 解析 YbProtocol
 k230_target_t t;
 if (tsp_k230_get_target(&t)) { ... }    // 有新帧返回 1: t.func_id/x/y/w/h/msg
 tsp_k230_frame_count();                 // 成功帧计数（错误帧见 error_count）
+tsp_uart_k230_send_string("...\n");     // G3519→K230 TX（阻塞式，115200 约 0.87ms/10B）
 tsp_uart_k230_rx_disable();             // 退出场景时关闭
 
 // ===== CCD（tsp_ccd.c） =====
