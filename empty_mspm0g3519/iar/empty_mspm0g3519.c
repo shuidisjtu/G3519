@@ -112,7 +112,7 @@ static void action_k230_test(void)
 	int16_t old_x = 0, old_y = 0, old_w = 0, old_h = 0;
 	int16_t last_disp_x = -1, last_disp_y = -1;
 	uint16_t last_fc = 0xFFFF, last_ec = 0xFFFF;
-	uint8_t has_old = 0, showed_x = 0;
+	uint8_t has_old = 0, showed_x = 0, toggle_cnt = 0;
 
 	/* Full-screen tracking view */
 	tsp_tft18_clear(BLACK);
@@ -128,12 +128,25 @@ static void action_k230_test(void)
 	tsp_uart_k230_rx_enable();
 
 	while (1) {
-		/* Scan keys at 1ms intervals for responsive PUSH detection */
+		/* Scan keys at 1ms intervals */
 		{
 			uint8_t i;
 			for (i = 0; i < 5; i++) {
 				tsp_key_scan();
 				if (tsp_key_pressed(KEY_PUSH)) goto exit_k230;
+				if (tsp_key_pressed(KEY_S0)) {
+					/* Send toggle command to K230 over UART6 TX */
+					tsp_uart_k230_send_string("$SWITCH#\n");
+					toggle_cnt++;
+					/* Show toggle count on row 5 */
+					{
+						char tb[4];
+						tb[0] = 'T'; tb[1] = ':';
+						tb[2] = '0' + (toggle_cnt % 10);
+						tb[3] = '\0';
+						tsp_tft18_show_str_color(0, 5, (uint8_t *)tb, WHITE, BLACK);
+					}
+				}
 				delay_1ms(1);
 			}
 		}
@@ -155,32 +168,38 @@ static void action_k230_test(void)
 			if (lcd_w < 2) lcd_w = 2;
 			if (lcd_h < 2) lcd_h = 2;
 
-			/* Erase previous rect with BLACK */
-			if (has_old) {
-				tsp_tft18_draw_frame((uint8_t)old_x, (uint8_t)old_y,
-				                     (uint8_t)old_w, (uint8_t)old_h, BLACK);
+			/* Redraw rect only when position/size changes (prevents flicker) */
+			if (!has_old || lcd_x != old_x || lcd_y != old_y ||
+			    lcd_w != old_w || lcd_h != old_h) {
+
+				if (has_old) {
+					/* Erase old rect at previous position */
+					tsp_tft18_draw_frame((uint8_t)old_x, (uint8_t)old_y,
+					                     (uint8_t)old_w, (uint8_t)old_h, BLACK);
+				}
+
+				/* Draw new rect at current position */
+				tsp_tft18_draw_frame((uint8_t)lcd_x, (uint8_t)lcd_y,
+				                     (uint8_t)lcd_w, (uint8_t)lcd_h, GREEN);
+
+				old_x = lcd_x; old_y = lcd_y;
+				old_w = lcd_w; old_h = lcd_h;
+				has_old = 1;
 			}
-
-			/* Draw current rect in GREEN */
-			tsp_tft18_draw_frame((uint8_t)lcd_x, (uint8_t)lcd_y,
-			                     (uint8_t)lcd_w, (uint8_t)lcd_h, GREEN);
-
-			old_x = lcd_x; old_y = lcd_y;
-			old_w = lcd_w; old_h = lcd_h;
-			has_old = 1;
 
 			/* Update X/Y display (row 6) only when values change */
 			if (!showed_x || tgt.x != last_disp_x || tgt.y != last_disp_y) {
 				if (!showed_x) {
 					/* First frame: clear "Waiting" hint */
-					tsp_tft18_show_str_color(0, 6, (uint8_t *)"               ",
-					                         WHITE, BLACK);
+					tsp_tft18_show_str_color(0, 6,
+					    (uint8_t *)"                    ", WHITE, BLACK);
 					showed_x = 1;
 				}
+				/* uint16 (5 digits, 40 px) — fits within allocated space */
 				tsp_tft18_show_str_color(0, 6, (uint8_t *)"X:", WHITE, BLACK);
-				tsp_tft18_show_int16(16, 6, tgt.x);
-				tsp_tft18_show_str_color(56, 6, (uint8_t *)"Y:", WHITE, BLACK);
-				tsp_tft18_show_int16(72, 6, tgt.y);
+				tsp_tft18_show_uint16(16, 6, (uint16_t)tgt.x);
+				tsp_tft18_show_str_color(56, 6, (uint8_t *)" Y:", WHITE, BLACK);
+				tsp_tft18_show_uint16(80, 6, (uint16_t)tgt.y);
 				last_disp_x = tgt.x;
 				last_disp_y = tgt.y;
 			}
