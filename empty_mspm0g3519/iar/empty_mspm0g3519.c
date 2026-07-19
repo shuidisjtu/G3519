@@ -5,10 +5,8 @@
 #include "tsp_key.h"
 #include "tsp_menu.h"
 #include "tsp_encoder.h"
-#include "tsp_uart.h"
 #include "tsp_uart_k230.h"
 #include "tsp_k230.h"
-#include <stdio.h>
 
 /* ===== Global state ===== */
 extern volatile uint32_t sys_tick_counter;
@@ -47,62 +45,6 @@ static void boot_animation(void)
 	tsp_tft18_clear(BLACK);
 }
 
-/* ===== UART Test ===== */
-
-static void action_uart_test(void)
-{
-	uint8_t i;
-	static uint16_t tx_count = 0;
-
-	for (i = 1; i < 8; i++) {
-		tsp_tft18_show_str_color(0, i, (uint8_t *)"                    ", WHITE, BLACK);
-	}
-
-	tsp_tft18_show_str_color(0, 1, (uint8_t *)"UART0 Test", YELLOW, BLACK);
-	tsp_tft18_show_str_color(0, 2, (uint8_t *)"115200 8N1  COM11", WHITE, BLACK);
-
-	/* TX test */
-	tsp_uart_send_string("=== UART0 TX Test ===\r\n");
-	tsp_uart_send_string("MSPM0G3519 @ 80MHz\r\n");
-	tx_count++;
-	printf("printf test: tx_count=%u\r\n", tx_count);
-	tsp_tft18_show_str_color(0, 3, (uint8_t *)"TX sent. Check SSCOM", GREEN, BLACK);
-
-	/* RX echo mode */
-	tsp_tft18_show_str_color(0, 5, (uint8_t *)"Send from SSCOM ->", CYAN, BLACK);
-	tsp_tft18_show_str_color(0, 7, (uint8_t *)"PUSH to exit", CYAN, BLACK);
-	tsp_uart_flush_rx();
-	tsp_uart_rx_enable();
-
-	{
-		uint8_t echo_buf[21];
-		uint8_t echo_pos = 0;
-		tsp_tft18_show_str_color(0, 6, (uint8_t *)"RX:                 ", WHITE, BLACK);
-
-		while (1) {
-			tsp_key_scan();
-			if (tsp_key_pressed(KEY_PUSH)) break;
-
-			while (tsp_uart_available()) {
-				uint8_t ch = tsp_uart_read_byte();
-				tsp_uart_send_byte(ch);  /* echo back */
-				if (ch >= 0x20 && ch <= 0x7E) {
-					echo_buf[echo_pos] = ch;
-					echo_pos++;
-					if (echo_pos >= 17) echo_pos = 0;
-					echo_buf[echo_pos] = '\0';
-					tsp_tft18_show_str_color(24, 6, echo_buf, GREEN, BLACK);
-				}
-			}
-			delay_1ms(5);
-		}
-	}
-
-	tsp_uart_rx_disable();
-	tsp_uart_send_string("\r\n=== UART0 Test End ===\r\n");
-	tsp_menu_request_redraw();
-}
-
 /* ===== K230 Vision Test (color tracking with LCD overlay) ===== */
 
 static void action_k230_test(void)
@@ -117,7 +59,7 @@ static void action_k230_test(void)
 	/* Full-screen tracking view */
 	tsp_tft18_clear(BLACK);
 	tsp_tft18_show_str_color(0, 0, (uint8_t *)"K230 Track", YELLOW, BLACK);
-	tsp_tft18_draw_line_h(0, 104, 160, BLUE);   /* divider y=104 */
+	tsp_tft18_draw_line_h(0, 96, 160, BLUE);    /* divider y=96 */
 
 	/* Initial diagnostic: show we're waiting */
 	tsp_tft18_show_str_color(0, 6, (uint8_t *)"Waiting for K230...", CYAN, BLACK);
@@ -144,7 +86,7 @@ static void action_k230_test(void)
 						tb[0] = 'T'; tb[1] = ':';
 						tb[2] = '0' + (toggle_cnt % 10);
 						tb[3] = '\0';
-						tsp_tft18_show_str_color(0, 5, (uint8_t *)tb, WHITE, BLACK);
+						tsp_tft18_show_str_color(90, 0, (uint8_t *)tb, WHITE, BLACK);
 					}
 				}
 				delay_1ms(1);
@@ -154,17 +96,23 @@ static void action_k230_test(void)
 		tsp_k230_task();
 
 		if (tsp_k230_get_target(&tgt)) {
-			/* Map K230 320x240 -> LCD 160x128: divide by 2 */
-			lcd_x = tgt.x / 2;
-			lcd_y = tgt.y / 2;
-			lcd_w = tgt.w / 2;
-			lcd_h = tgt.h / 2;
+			/* Map K230 640x480 -> LCD canvas 160x80 (y=16..95):
+			 *   X: /4 (0..639 → 0..159),  Y: /6+16 (0..479 → 16..95) */
+			lcd_x = tgt.x / 4;
+			lcd_y = 16 + tgt.y / 6;
+			lcd_w = tgt.w / 4;
+			lcd_h = tgt.h / 6;
 
-			/* Clamp to canvas (pixel y <= 103, x <= 159) */
+			/* Clamp to canvas (title y=0..15, bottom divider y=104, x <= 159) */
 			if (lcd_x < 0) lcd_x = 0;
-			if (lcd_y < 0) lcd_y = 0;
 			if (lcd_x + lcd_w > 159) lcd_w = 159 - lcd_x;
-			if (lcd_y + lcd_h > 103) lcd_h = 103 - lcd_y;
+
+			/* Protect title row: push top edge below row 0 (16 px) */
+			if (lcd_y < 16) {
+				lcd_h -= (16 - lcd_y);
+				lcd_y = 16;
+			}
+			if (lcd_y + lcd_h > 95) lcd_h = 95 - lcd_y;
 			if (lcd_w < 2) lcd_w = 2;
 			if (lcd_h < 2) lcd_h = 2;
 
@@ -197,7 +145,7 @@ static void action_k230_test(void)
 				}
 				/* uint16 (5 digits, 40 px) — fits within allocated space */
 				tsp_tft18_show_str_color(0, 6, (uint8_t *)"X:", WHITE, BLACK);
-				tsp_tft18_show_uint16(16, 6, (uint16_t)tgt.x);
+				tsp_tft18_show_uint16(16, 6, (uint16_t)(tgt.x / 4));
 				tsp_tft18_show_str_color(56, 6, (uint8_t *)" Y:", WHITE, BLACK);
 				tsp_tft18_show_uint16(80, 6, (uint16_t)tgt.y);
 				last_disp_x = tgt.x;
@@ -241,10 +189,9 @@ exit_k230:
 	tsp_menu_request_redraw();
 }
 
-/* ===== Main Menu (2 items) ===== */
+/* ===== Main Menu ===== */
 
 static tsp_menu_item_t main_menu[] = {
-	{"UART Test",     action_uart_test},
 	{"K230 Test",     action_k230_test},
 };
 
@@ -263,10 +210,6 @@ int main(void)
 
 	/* Init encoder (uses SysConfig PHA0 interrupt) */
 	tsp_encoder_init();
-
-	/* Init UART0: 115200-8N1, BUSCLK/2=40MHz (PD0 max), OVS auto-select */
-	tsp_uart_init(115200);
-	tsp_uart_send_string("MSPM0G3519 booted\r\n");
 
 	/* Init UART6 for K230 vision module (J11, BUSCLK 80MHz, 115200 preset).
 	 * RX interrupt stays off until K230 Test enables it on demand. */

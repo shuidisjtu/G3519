@@ -213,6 +213,8 @@ RX 中断触发
 | 波特率分频 | IBRD=2, FBRD=11（由 SDK 自动计算） |
 | PC 端 | DAPLink 虚拟串口 (COM11) |
 
+> ⚠️ **已知问题（2026-07-19）**：UART0 在不接 DAPLink 时 TX 阻塞（NRST=2.5V 临界电压导致 MFCLK 时钟不稳定，`DL_UART_transmitDataBlocking()` 永久等待）。当前固件已从 `main()` 移除 `tsp_uart_init()`，printf/UART0 调试输出仅在接 DAPLink 时可用。详见 `README.md` 已知问题。
+
 UART6（K230 视觉模块通道，2026-07-17 实测验证，详见 `K230_Vision_Module_Use.md`）：
 
 | 项目 | 配置 |
@@ -238,7 +240,7 @@ UART6（K230 视觉模块通道，2026-07-17 实测验证，详见 `K230_Vision_
 1. 连接 DAPLink 到主板 J1（红边对准 RST/1 脚）
 2. PC 端打开 SSCOM，选择 DAPLink 虚拟串口（如 COM11），115200-8N1
 3. 烧录并运行程序，开机后应收到 `MSPM0G3519 booted`
-4. 进入菜单 → UART Test → SSCOM 发送字符 → 确认收到回显
+4. ⚠️ 当前固件已移除 UART0 初始化（脱机阻塞问题），上述自检需临时在 `main()` 中恢复 `tsp_uart_init(115200)` 和 `tsp_uart_send_string()` 调用
 
 ### 9.2 回环测试（硬件验证）
 

@@ -78,12 +78,12 @@ SYSCFG_DL_init();                      // SysConfig 生成（GPIO/SPI/时钟/Sys
 tsp_tft18_init();                      // LCD
 boot_animation();                      // 开机动画（色彩测试+启动信息+蜂鸣器）
 tsp_encoder_init();                    // 编码器（默认禁用 PHA0 中断）
-tsp_uart_init(115200);                  // UART0（SysConfig 预设 MFCLK 4MHz 时钟）
+// tsp_uart_init(115200);              // UART0 [已移除：脱机 NRST=2.5V 时 TX 阻塞，见 README 已知问题]
 tsp_uart_k230_init();                   // UART6→K230（SysConfig 已定 115200，RX 按需开）
 tsp_k230_init();                        // K230 协议解析器复位
 // tsp_ccd_init();                     // CCD [未启用，无外接模块]
 tsp_key_init();                        // 按键
-tsp_menu_init(title, items, count);    // 菜单
+tsp_menu_init(title, items, count);    // 菜单（当前仅 1 项：K230 Test）
 
 // ===== GPIO 宏（tsp_gpio.h） =====
 LED_ON(); LED_OFF(); LED_TOGGLE();
@@ -113,15 +113,20 @@ int32_t cnt = tsp_encoder_get_count(); // 原子读取
 int16_t spd = tsp_encoder_get_speed(); // 脉冲/20ms
 tsp_encoder_reset();
 
-// ===== UART（tsp_uart.c，时钟=MFCLK 4MHz，PD0 安全） =====
+// ===== UART0（tsp_uart.c，时钟=MFCLK 4MHz，PD0 安全） =====
+// ⚠️ 已从 main() 移除：脱机（不接 DAPLink）时 NRST=2.5V 导致 MFCLK 不稳定，
+//    UART0 TX（含 printf）会永久阻塞。仅接 DAPLink 调试时可临时启用。见 README 已知问题。
 tsp_uart_init(115200);                  // SysConfig 预设后再调（仅改波特率+缓冲）
 tsp_uart_send_string("hello\r\n");
-printf("val=%d\n", x);                 // 已重定向到 UART0
+printf("val=%d\n", x);                 // 已重定向到 UART0（__write → DL_UART_transmitDataBlocking）
 if (tsp_uart_available()) { uint8_t ch = tsp_uart_read_byte(); }
 tsp_uart_rx_enable();                   // 按需开启 RX 中断（防止浮空噪声风暴）
 tsp_uart_rx_disable();                  // 用完后关闭 RX 中断
 
 // ===== K230 视觉模块（tsp_uart_k230.c + tsp_k230.c，UART6/J11，双向已验证） =====
+// 坐标映射：K230 传感器 640×480 → LCD 画布 160×80 (y=16..95)
+//   lcd_x = tgt.x / 4,  lcd_w = tgt.w / 4
+//   lcd_y = 16 + tgt.y / 6,  lcd_h = tgt.h / 6
 tsp_uart_k230_rx_enable();              // 进入使用场景时开启接收
 tsp_k230_task();                        // 主循环调用：消费环形缓冲 + 解析 YbProtocol
 k230_target_t t;
