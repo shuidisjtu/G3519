@@ -42,7 +42,8 @@ empty_mspm0g3519/
     ├── tsp_encoder.h/.c               ← 编码器（PHA0 中断正交解码，20ms 速度）
     ├── tsp_uart.h/.c                  ← UART0（MFCLK 4MHz, 115200-8N1, 环形缓冲 RX）
     ├── tsp_uart_k230.h/.c             ← UART6（K230, BUSCLK 80MHz, 115200, 环形缓冲 RX）
-    └── tsp_k230.h/.c                  ← K230 YbProtocol 解析（主循环状态机, $...# 断帧）
+    ├── tsp_k230.h/.c                  ← K230 YbProtocol 解析（主循环状态机, $...# 断帧）
+    └── tsp_ad5933.h/.c                ← AD5933 阻抗测量（I2C1, 100kHz, 温度+扫频）
 ```
 
 ## 关键硬件约束
@@ -69,6 +70,8 @@ empty_mspm0g3519/
 | UART0 | PA10(TX), PA11(RX) | IOMUX_PINCM21/22 |
 | UART6 (K230) | PC11(TX), PC10(RX)，J11 排座 | `UART_K230_INST`（SysConfig 宏） |
 | CCD ADC | PC2(CH12-CCD1), PC3(CH13-CCD2) | ADC0 手动配置 |
+| DDS | PC2(SCLK), PC3(SDATA), PC24(FSYNC) | `DDS_SCLK/SDATA/FSYNC` |
+| AD5933 (I2C1) | PA29(SCL), PA30(SDA) | `I2C_AD5933_INST`（SysConfig 宏） |
 
 ## API 速查
 
@@ -139,6 +142,23 @@ tsp_uart_k230_rx_disable();             // 退出场景时关闭
 ccd_data_t pixels;                     // uint16_t[128]
 tsp_ccd_snapshot(CCD1, pixels);        // flush → 曝光 → 读 128 像素
 tsp_ccd_set_exposure(15);              // 曝光时间 ms
+
+// ===== AD5933 Impedance Analyzer（I2C1，详见 docs/AD5933_Use.md）=====
+tsp_ad5933_init();                           // 复位 + 外部时钟 + 待机
+float temp = tsp_ad5933_read_temperature();  // 读温度（°C），500ms 超时返回 NAN
+if (temp != temp) { /* NAN → 超时，显示错误 */ }  // NaN 自检（不依赖 math.h）
+tsp_ad5933_set_sweep(start, delta, n, cyc);  // 配置扫频参数
+tsp_ad5933_start_sweep();                    // 启动扫频
+int16_t re = tsp_ad5933_read_real();         // 读实部
+int16_t im = tsp_ad5933_read_imag();         // 读虚部
+
+// ===== AD9833 DDS Waveform Generator（bit-bang GPIO: PC2=SCLK, PC3=SDATA, PC24=FSYNC, MCLK=25MHz X1）=====
+// 输出端子: J12 (同轴), J22 (2-pin). 仅方波模式已实现.
+#define AD9833_RESET    0x2100               // Control: B28=1, RESET=1
+#define AD9833_SQWAVE   0x0020               // Control: OPBITEN=1 (square wave on VOUT)
+#define AD9833_FREQ0    0x4000               // FREQ0 register select (D14=1)
+dds_squarewave(freq_hz);                     // 初始化 + 输出方波（B28=1 连续 28-bit 写）
+dds_write(AD9833_RESET);                     // 停止: DDS 回到复位/中位输出
 ```
 
 ## IAR 关键路径
