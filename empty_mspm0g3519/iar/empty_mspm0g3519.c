@@ -8,6 +8,8 @@
 #include "tsp_uart_k230.h"
 #include "tsp_k230.h"
 #include "tsp_ad5933.h"
+#include "tsp_motor.h"
+#include "tsp_dds.h"
 #include <math.h>
 
 /* ===== Global state ===== */
@@ -191,90 +193,6 @@ exit_k230:
 	tsp_menu_request_redraw();
 }
 
-/* ===== AD9833 DDS Waveform Generator ===== */
-
-/* AD9833 DDS constants */
-#define DDS_MCLK    25000000UL          /* 25 MHz master clock (X1 on board) */
-#define DDS_FREQ_REG(f_hz) \
-    ((uint32_t)(((uint64_t)(f_hz) * 268435456ULL + (DDS_MCLK / 2)) / DDS_MCLK))
-
-/* AD9833 control register bits */
-#define AD9833_RESET     0x2100         /* B28=1, RESET=1 */
-#define AD9833_FREQ0     0x4000         /* D15-D14=01 -> FREQ0 register select */
-#define AD9833_SINE      0x2000         /* B28=1, OPBITEN=0, MODE=0 -> sine (DAC) */
-#define AD9833_TRIANGLE  0x2002         /* B28=1, OPBITEN=0, MODE=1 -> triangle (DAC) */
-#define AD9833_SQUARE    0x2028         /* B28=1, OPBITEN=1, DIV2=1 -> square (MSB) */
-
-/* --- Send 16-bit word to AD9833, MSB first, falling-edge SCLK --- */
-static void dds_write(uint16_t data)
-{
-	uint8_t i;
-	/* AD9833 datasheet: SCLK idles HIGH (CPOL=1).
-	 * FSYNC falling edge must occur while SCLK is HIGH.
-	 * AD9833 samples SDATA on every SCLK falling edge. */
-	DDS_FSYNC_HIGH();
-	DDS_SCLK_HIGH();
-	DDS_SDATA_LOW();
-	DDS_FSYNC_LOW();
-	for (i = 0; i < 16; i++) {
-		if (data & 0x8000) {
-			DDS_SDATA_HIGH();
-		} else {
-			DDS_SDATA_LOW();
-		}
-		DDS_SCLK_LOW();       /* Falling edge → AD9833 samples SDATA */
-		DDS_SCLK_HIGH();      /* Rising  edge → prepare next bit */
-		data <<= 1;
-	}
-	DDS_SDATA_LOW();
-	DDS_FSYNC_HIGH();
-	/* SCLK stays HIGH (idle per CPOL=1) */
-}
-
-/* --- Generic AD9833 init: load FREQ0, output selected waveform --- */
-static void dds_set_output(uint32_t freq_hz, uint16_t waveform_ctrl)
-{
-	uint32_t reg;
-	uint16_t lsb, msb;
-
-	reg = DDS_FREQ_REG(freq_hz);
-	lsb = AD9833_FREQ0 | ((uint16_t)(reg & 0x3FFF));
-	msb = AD9833_FREQ0 | ((uint16_t)((reg >> 14) & 0x3FFF));
-
-	dds_write(AD9833_RESET);
-	dds_write(lsb);
-	dds_write(msb);
-	dds_write(waveform_ctrl);
-}
-
-/* --- Waveform metadata --- */
-static const char * const dds_wave_names[] = {
-	"Square", "Sine", "Triangle"
-};
-static const char * const dds_vout_info[] = {
-	"Vout ~3.1V (MSB)",
-	"Vout ~0.6Vpp (DAC)",
-	"Vout ~0.6Vpp (DAC)",
-};
-static const uint16_t dds_wave_ctrl[] = {
-	AD9833_SQUARE, AD9833_SINE, AD9833_TRIANGLE
-};
-#define DDS_WAVE_COUNT  (sizeof(dds_wave_ctrl) / sizeof(dds_wave_ctrl[0]))
-
-/* --- Get adaptive frequency step --- */
-static uint32_t dds_get_step(uint32_t freq, int32_t delta)
-{
-	uint32_t base;
-	if      (freq < 1000)  base = 10;
-	else if (freq < 10000) base = 100;
-	else                   base = 1000;   /* 10 kHz ~ 50 kHz */
-
-	/* Fast rotation: coarser step */
-	if (delta >= 3 || delta <= -3) base *= 10;
-
-	return base;
-}
-
 /* --- Interactive DDS Test --- */
 static void action_dds_test(void)
 {
@@ -292,7 +210,7 @@ static void action_dds_test(void)
 	tsp_tft18_show_str_color(0, 7, (uint8_t *)"PUSH to exit", GRAY1, BLACK);
 
 	/* Start DDS (polled encoder — no ISR needed) */
-	dds_set_output(freq, dds_wave_ctrl[wave_idx]);
+	tsp_dds_set_output(freq, tsp_dds_wave_ctrl[wave_idx]);
 
 	{
 		uint8_t  last_a   = (PHA0() != 0) ? 1 : 0;
@@ -330,7 +248,7 @@ static void action_dds_test(void)
 
 				/* Apply encoder accumulation */
 				if (enc_acc != 0) {
-					uint32_t step = dds_get_step(freq, enc_acc);
+					uint32_t step = tsp_dds_get_step(freq, enc_acc);
 					int32_t  new_freq = (int32_t)freq + enc_acc * (int32_t)step;
 
 					if      (new_freq < 100)    freq = 100;
@@ -343,7 +261,7 @@ static void action_dds_test(void)
 
 			/* --- Reconfigure DDS if needed --- */
 			if (wave_idx != last_wave || freq != last_freq) {
-				dds_set_output(freq, dds_wave_ctrl[wave_idx]);
+				tsp_dds_set_output(freq, tsp_dds_wave_ctrl[wave_idx]);
 			}
 
 			/* --- Incremental LCD update: waveform row --- */
@@ -352,12 +270,12 @@ static void action_dds_test(void)
 				uint8_t p = 0;
 				buf[p++] = 'W'; buf[p++] = 'a'; buf[p++] = 'v'; buf[p++] = 'e';
 				buf[p++] = ':'; buf[p++] = ' ';
-				for (i = 0; dds_wave_names[wave_idx][i]; i++)
-					buf[p++] = (char)dds_wave_names[wave_idx][i];
+				for (i = 0; tsp_dds_wave_names[wave_idx][i]; i++)
+					buf[p++] = (char)tsp_dds_wave_names[wave_idx][i];
 				while (p < 20) buf[p++] = ' ';
 				buf[20] = '\0';
 				tsp_tft18_show_str_color(0, 2, (uint8_t *)buf, CYAN, BLACK);
-				tsp_tft18_show_str_color(0, 4, (uint8_t *)dds_vout_info[wave_idx],
+				tsp_tft18_show_str_color(0, 4, (uint8_t *)tsp_dds_vout_info[wave_idx],
 				                         WHITE, BLACK);
 				last_wave = wave_idx;
 			}
@@ -389,7 +307,7 @@ static void action_dds_test(void)
 	}
 
 	/* Cleanup */
-	dds_write(AD9833_RESET);
+	tsp_dds_stop();
 	tsp_menu_request_redraw();
 }
 
@@ -411,16 +329,19 @@ static void action_ad5933_test(void)
 	float temp;
 	int16_t real, imag;
 	float mag;
+	float gain_factor = 0.0f;
+
+	#define CAL_RESISTANCE  18000.0f
 
 	tsp_tft18_clear(BLACK);
 	tsp_tft18_show_str_color(0, 0, (uint8_t *)"AD5933 Impedance", YELLOW, BLUE);
 	tsp_tft18_show_str_color(0, 7, (uint8_t *)"PUSH to exit", GRAY1, BLACK);
 
-	/* --- Init via library API (verifies P2 fix) --- */
+	/* --- Init --- */
 	tsp_ad5933_init();
 	delay_1ms(10);
 
-	/* --- Read back and display CTRL_H/CTRL_L --- */
+	/* --- Display CTRL_H/CTRL_L --- */
 	{
 		uint8_t vh = tsp_ad5933_read_reg(AD5933_REG_CTRL_H);
 		uint8_t vl = tsp_ad5933_read_reg(AD5933_REG_CTRL_L);
@@ -433,11 +354,9 @@ static void action_ad5933_test(void)
 		tsp_tft18_show_str_color(0, 1, (uint8_t *)buf, WHITE, BLACK);
 	}
 
-	/* --- Temperature via library API (verifies P6 fix) --- */
+	/* --- Temperature --- */
 	temp = tsp_ad5933_read_temperature();
-	/* NaN check (NaN is the only float != itself) — no math.h needed */
 	if (temp != temp) {
-		/* Temperature read timed out — show error but keep going */
 		tsp_tft18_show_str_color(0, 2,
 			(uint8_t *)"T: --.-C (no resp)", YELLOW, BLACK);
 	} else {
@@ -454,48 +373,87 @@ static void action_ad5933_test(void)
 		tsp_tft18_show_str_color(0, 2, (uint8_t *)buf, WHITE, BLACK);
 	}
 
-	/* --- Configure sweep and start (verifies P3 fix) --- */
+	/* ===== Calibration phase ===== */
+	tsp_tft18_show_str_color(0, 3, (uint8_t *)"Cal: 18000 Ohm", CYAN, BLACK);
+	tsp_tft18_show_str_color(0, 4, (uint8_t *)"Connect Rcal to J15", WHITE, BLACK);
+	tsp_tft18_show_str_color(0, 5, (uint8_t *)"S2=Calibrate", GRAY1, BLACK);
+
+	while (1) {
+		tsp_key_scan();
+		if (tsp_key_pressed(KEY_PUSH)) goto exit_ad5933;
+		if (tsp_key_pressed(KEY_S2)) break;
+		delay_1ms(10);
+	}
+
+	tsp_tft18_show_str_color(0, 4, (uint8_t *)"Calibrating...      ", YELLOW, BLACK);
+	tsp_tft18_show_str_color(0, 5, (uint8_t *)"                    ", BLACK, BLACK);
+
 	tsp_ad5933_set_sweep(1000, 0, 0, 100, AD5933_SETTLE_X1);
 	tsp_ad5933_start_sweep();
 
-	/* Display static labels for live data */
-	tsp_tft18_show_str_color(0, 3, (uint8_t *)"Freq: 1000 Hz", WHITE, BLACK);
-	tsp_tft18_show_str_color(0, 4, (uint8_t *)"Real:", CYAN, BLACK);
-	tsp_tft18_show_str_color(0, 5, (uint8_t *)"Imag:", CYAN, BLACK);
-	tsp_tft18_show_str_color(0, 6, (uint8_t *)"Mag :", GREEN, BLACK);
+	/* Wait for DFT data valid */
+	{
+		uint32_t timeout = 50000;
+		while (!(tsp_ad5933_read_status() & AD5933_STATUS_DATA_VALID) && --timeout)
+			;
+	}
 
-	/* --- Live display loop: Real/Imag/Magnitude + periodic temperature --- */
+	{
+		int16_t cal_real = tsp_ad5933_read_real();
+		int16_t cal_imag = tsp_ad5933_read_imag();
+		float cal_mag = sqrtf((float)cal_real * cal_real +
+		                      (float)cal_imag * cal_imag);
+
+		if (cal_mag > 1.0f) {
+			gain_factor = 1.0f / (CAL_RESISTANCE * cal_mag);
+		}
+	}
+
+	if (gain_factor > 0.0f) {
+		tsp_tft18_show_str_color(0, 4, (uint8_t *)"Cal OK! Replace DUT ", GREEN, BLACK);
+	} else {
+		tsp_tft18_show_str_color(0, 4, (uint8_t *)"Cal FAIL (Mag=0)    ", RED, BLACK);
+	}
+	tsp_tft18_show_str_color(0, 5, (uint8_t *)"S2=Start measuring  ", GRAY1, BLACK);
+
+	while (1) {
+		tsp_key_scan();
+		if (tsp_key_pressed(KEY_PUSH)) goto exit_ad5933;
+		if (tsp_key_pressed(KEY_S2)) break;
+		delay_1ms(10);
+	}
+
+	/* ===== Measurement phase ===== */
+	/* Restart sweep for measurement */
+	tsp_ad5933_start_sweep();
+
+	/* Redraw static labels (pad to 20 chars to clear calibration text) */
+	tsp_tft18_show_str_color(0, 3, (uint8_t *)"Freq: 1000 Hz       ", WHITE, BLACK);
+	tsp_tft18_show_str_color(0, 4, (uint8_t *)"Real:               ", CYAN, BLACK);
+	tsp_tft18_show_str_color(0, 5, (uint8_t *)"Imag:               ", CYAN, BLACK);
+	if (gain_factor > 0.0f) {
+		tsp_tft18_show_str_color(0, 6, (uint8_t *)"Z   :               ", GREEN, BLACK);
+	} else {
+		tsp_tft18_show_str_color(0, 6, (uint8_t *)"Mag :               ", GREEN, BLACK);
+	}
+
+	/* --- Live display loop --- */
 	{
 		uint8_t  temp_tick = 0;
-		int16_t  last_temp_x10 = (int16_t)(temp * 10.0f + 0.5f); /* avoid flicker */
+		int16_t  last_temp_x10 = (int16_t)(temp * 10.0f + 0.5f);
 
 		while (1) {
-			tsp_key_scan();
-			if (tsp_key_pressed(KEY_PUSH)) goto exit_ad5933;
-
-			/* Refresh temperature every ~1s (20 * 50ms).
-			   read_temperature() blocks ~30ms — acceptable at 1Hz. */
-			temp_tick++;
-			if (temp_tick >= 20) {
-				temp_tick = 0;
-				temp = tsp_ad5933_read_temperature();
-				if (temp == temp) {       /* not NaN */
-					int16_t tx = (int16_t)(temp * 10.0f + 0.5f);
-					if (tx != last_temp_x10) {
-						char buf[21]; uint8_t p = 0;
-						int16_t ti = (int16_t)temp;
-						uint8_t td = (uint8_t)((temp - (float)ti) * 10.0f + 0.5f);
-						buf[p++] = 'T'; buf[p++] = ':';
-						if (ti < 0) { buf[p++] = '-'; ti = -ti; }
-						if (ti >= 10) buf[p++] = '0' + (ti / 10) % 10;
-						buf[p++] = '0' + (ti % 10);
-						buf[p++] = '.'; buf[p++] = '0' + td; buf[p++] = 'C';
-						while (p < 20) buf[p++] = ' ';
-						buf[20] = '\0';
-						tsp_tft18_show_str_color(0, 2, (uint8_t *)buf, WHITE, BLACK);
-						last_temp_x10 = tx;
-					}
+			/* Wait for DATA_VALID, polling keys every 10ms */
+			{
+				uint8_t wait;
+				for (wait = 0; wait < 50; wait++) {
+					delay_1ms(10);
+					tsp_key_scan();
+					if (tsp_key_pressed(KEY_PUSH)) goto exit_ad5933;
+					if (tsp_ad5933_read_status() & AD5933_STATUS_DATA_VALID)
+						break;
 				}
+				if (wait >= 50) continue;
 			}
 
 			/* Read DFT data */
@@ -529,27 +487,179 @@ static void action_ad5933_test(void)
 				buf[p] = '\0';
 				tsp_tft18_show_str_color(40, 5, (uint8_t *)buf, WHITE, BLACK);
 			}
-			/* Display Magnitude */
+			/* Display Z (Ohm) or raw Mag */
 			{
-				char buf[14]; uint8_t p = 0;
-				uint16_t m = (uint16_t)mag;
-				buf[p++] = '0' + (m / 10000) % 10;
-				buf[p++] = '0' + (m / 1000) % 10;
-				buf[p++] = '0' + (m / 100) % 10;
-				buf[p++] = '0' + (m / 10) % 10;
-				buf[p++] = '0' + (m % 10);
+				char buf[21]; uint8_t p = 0;
+				if (gain_factor > 0.0f && mag > 1.0f) {
+					float z_ohm = 1.0f / (gain_factor * mag);
+					uint32_t z = (uint32_t)(z_ohm + 0.5f);
+					if (z > 99999) z = 99999;
+					buf[p++] = '0' + (z / 10000) % 10;
+					buf[p++] = '0' + (z / 1000) % 10;
+					buf[p++] = '0' + (z / 100) % 10;
+					buf[p++] = '0' + (z / 10) % 10;
+					buf[p++] = '0' + (z % 10);
+					buf[p++] = ' '; buf[p++] = 'O'; buf[p++] = 'h';
+					buf[p++] = 'm'; buf[p++] = ' ';
+				} else {
+					uint16_t m = (uint16_t)mag;
+					buf[p++] = '0' + (m / 10000) % 10;
+					buf[p++] = '0' + (m / 1000) % 10;
+					buf[p++] = '0' + (m / 100) % 10;
+					buf[p++] = '0' + (m / 10) % 10;
+					buf[p++] = '0' + (m % 10);
+					buf[p++] = ' '; buf[p++] = ' '; buf[p++] = ' ';
+					buf[p++] = ' '; buf[p++] = ' ';
+				}
 				buf[p] = '\0';
 				tsp_tft18_show_str_color(40, 6, (uint8_t *)buf, GREEN, BLACK);
 			}
 
-			delay_1ms(50);
+			/* Trigger next measurement at same frequency.
+			 * REPEAT_FREQ re-runs DFT without re-initializing the DDS,
+			 * per AD5933 datasheet Figure 27. */
+			tsp_ad5933_write_reg(AD5933_REG_CTRL_H,
+				(uint8_t)((AD5933_CTRL_REPEAT_FREQ | AD5933_VOLT_2000MV | AD5933_PGA_X1) >> 8));
+			tsp_ad5933_write_reg(AD5933_REG_CTRL_L, AD5933_CLK_EXTERNAL);
+
+			/* Periodic temperature refresh (~5s to reduce sweep interruption) */
+			temp_tick++;
+			if (temp_tick >= 20) {
+				temp_tick = 0;
+				temp = tsp_ad5933_read_temperature();
+				if (temp == temp) {
+					int16_t tx = (int16_t)(temp * 10.0f + 0.5f);
+					if (tx != last_temp_x10) {
+						char buf[21]; uint8_t p = 0;
+						int16_t ti = (int16_t)temp;
+						uint8_t td = (uint8_t)((temp - (float)ti) * 10.0f + 0.5f);
+						buf[p++] = 'T'; buf[p++] = ':';
+						if (ti < 0) { buf[p++] = '-'; ti = -ti; }
+						if (ti >= 10) buf[p++] = '0' + (ti / 10) % 10;
+						buf[p++] = '0' + (ti % 10);
+						buf[p++] = '.'; buf[p++] = '0' + td; buf[p++] = 'C';
+						while (p < 20) buf[p++] = ' ';
+						buf[20] = '\0';
+						tsp_tft18_show_str_color(0, 2, (uint8_t *)buf, WHITE, BLACK);
+						last_temp_x10 = tx;
+					}
+				}
+			}
 		}
 	}
 
 exit_ad5933:
-	/* Stop DDS output */
 	tsp_ad5933_write_reg(AD5933_REG_CTRL_H,
 		(uint8_t)(AD5933_CTRL_POWER_DOWN >> 8));
+	tsp_menu_request_redraw();
+}
+
+/* ===== Motor Test (AD2-friendly interactive PWM control) ===== */
+
+static void action_motor_test(void)
+{
+	uint8_t  motor      = MOTOR1;
+	uint8_t  dir[2]     = {MOTOR_FORWARD, MOTOR_FORWARD};
+	uint16_t duty[2]    = {0, 0};
+	uint8_t  redraw     = 1;
+	uint8_t  tick       = 0;
+
+	tsp_tft18_clear(BLACK);
+	tsp_tft18_show_str_color(0, 0, (uint8_t *)"Motor Test TIMA0", YELLOW, BLUE);
+	tsp_tft18_draw_line_h(0, 16, 160, BLUE);
+	tsp_tft18_show_str_color(0, 4, (uint8_t *)"PWM: 20kHz (50us)  ", WHITE, BLACK);
+	tsp_tft18_show_str_color(0, 6, (uint8_t *)"S0/S1:Duty S2:Dir", GRAY1, BLACK);
+	tsp_tft18_show_str_color(0, 7, (uint8_t *)"M1/M2:Enc PUSH:exit", GRAY1, BLACK);
+
+	tsp_motor_init();
+	SLEEP_HIGH();
+	tsp_encoder_enable();
+
+	while (1) {
+		tsp_key_scan();
+		if (tsp_key_pressed(KEY_PUSH)) goto exit_motor;
+
+		/* Encoder: switch motor — left=M2, right=M1 */
+		{
+			int32_t enc = tsp_encoder_get_count();
+			if (enc != 0) {
+				uint8_t new_m = (enc < 0) ? MOTOR2 : MOTOR1;
+				if (new_m != motor) { motor = new_m; redraw = 1; }
+				tsp_encoder_reset();
+			}
+		}
+
+		/* S2: toggle direction for selected motor */
+		if (tsp_key_pressed(KEY_S2)) {
+			dir[motor] = (dir[motor] == MOTOR_FORWARD) ? MOTOR_BACKWARD : MOTOR_FORWARD;
+			tsp_motor_set(motor, dir[motor], duty[motor]);
+			redraw = 1;
+		}
+
+		/* S0: duty -5, S1: duty +5 for selected motor */
+		if (tsp_key_pressed(KEY_S0)) {
+			if (duty[motor] >= 5) duty[motor] -= 5; else duty[motor] = 0;
+			tsp_motor_set(motor, dir[motor], duty[motor]);
+			redraw = 1;
+		}
+		if (tsp_key_pressed(KEY_S1)) {
+			if (duty[motor] <= 95) duty[motor] += 5; else duty[motor] = 100;
+			tsp_motor_set(motor, dir[motor], duty[motor]);
+			redraw = 1;
+		}
+
+		/* Incremental LCD update */
+		if (redraw) {
+			char buf[21];
+			uint8_t p = 0, i;
+			char dname[4] = "FWD";
+
+			if (dir[motor] == MOTOR_BACKWARD) { dname[0]='R'; dname[1]='E'; dname[2]='V'; }
+
+			buf[p++] = 'M'; buf[p++] = (motor == MOTOR1) ? '1' : '2';
+			buf[p++] = ':'; buf[p++] = ' ';
+			buf[p++] = dname[0]; buf[p++] = dname[1]; buf[p++] = dname[2];
+			buf[p++] = ' ';
+			if (duty[motor] >= 100) { buf[p++] = '1'; buf[p++] = '0'; buf[p++] = '0'; }
+			else if (duty[motor] >= 10) { buf[p++] = '0' + (duty[motor]/10)%10; buf[p++] = '0' + duty[motor]%10; }
+			else { buf[p++] = ' '; buf[p++] = '0' + duty[motor]%10; }
+			buf[p++] = '%';
+			while (p < 20) buf[p++] = ' ';
+			buf[20] = '\0';
+			tsp_tft18_show_str_color(0, 2, (uint8_t *)buf, CYAN, BLACK);
+
+			/* Duty bar (row 3) */
+			{
+				uint8_t bar_fill = (uint8_t)(duty[motor] / 10);
+				buf[0] = 'D'; buf[1] = 'u'; buf[2] = 't'; buf[3] = 'y';
+				buf[4] = ':'; buf[5] = '[';
+				for (i = 0; i < 10; i++) {
+					buf[6+i] = (i < bar_fill) ? '#' : ' ';
+				}
+				buf[16] = ']'; buf[17] = '\0';
+				tsp_tft18_show_str_color(0, 3, (uint8_t *)buf, WHITE, BLACK);
+			}
+
+			redraw = 0;
+		}
+
+		/* nFAULT: poll every ~200ms, always refresh */
+		tick++;
+		if (tick >= 20) {
+			tick = 0;
+			if (tsp_motor_fault())
+				tsp_tft18_show_str_color(0, 5, (uint8_t *)"nFAULT: FAULT!      ", RED, BLACK);
+			else
+				tsp_tft18_show_str_color(0, 5, (uint8_t *)"nFAULT: OK          ", GREEN, BLACK);
+		}
+
+		delay_1ms(10);
+	}
+
+exit_motor:
+	tsp_encoder_disable();
+	tsp_motor_stop_all();
+	SLEEP_LOW();
 	tsp_menu_request_redraw();
 }
 
@@ -559,6 +669,7 @@ static tsp_menu_item_t main_menu[] = {
 	{"K230 Test",      action_k230_test},
 	{"DDS Test",       action_dds_test},
 	{"AD5933 Test",    action_ad5933_test},
+	{"Motor Test",     action_motor_test},
 };
 
 #define MAIN_MENU_COUNT  (sizeof(main_menu) / sizeof(main_menu[0]))
