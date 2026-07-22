@@ -42,9 +42,9 @@
 #define AD5933_VOLT_400MV            0x0400  /* 0.4 V p-p */
 #define AD5933_VOLT_1000MV           0x0600  /* 1.0 V p-p */
 
-/* PGA gain (CTRL_H D8) */
-#define AD5933_PGA_X1                0x0000
-#define AD5933_PGA_X5                0x0100
+/* PGA gain (CTRL_H D8): datasheet Table 7 — D8=1 means ×1, D8=0 means ×5 */
+#define AD5933_PGA_X1                0x0100
+#define AD5933_PGA_X5                0x0000
 
 /* Internal clock (CTRL_L D3) */
 #define AD5933_CLK_INTERNAL          0x0000

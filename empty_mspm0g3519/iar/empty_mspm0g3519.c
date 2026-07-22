@@ -9,7 +9,9 @@
 #include "tsp_k230.h"
 #include "tsp_ad5933.h"
 #include "tsp_motor.h"
-#include "tsp_dds.h"
+/* [ARCHIVED] DDS — PC2/PC3 conflict with CCD analog inputs. Keep tsp_dds.c/h. */
+// #include "tsp_dds.h"
+#include "tsp_ccd.h"
 #include <math.h>
 
 /* ===== Global state ===== */
@@ -193,7 +195,8 @@ exit_k230:
 	tsp_menu_request_redraw();
 }
 
-/* --- Interactive DDS Test --- */
+/* --- Interactive DDS Test [ARCHIVED] --- */
+#if 0
 static void action_dds_test(void)
 {
 	uint8_t i;
@@ -310,6 +313,7 @@ static void action_dds_test(void)
 	tsp_dds_stop();
 	tsp_menu_request_redraw();
 }
+#endif /* [ARCHIVED] DDS action_dds_test */
 
 /* ===== AD5933 Impedance Test =====
  * Uses library API (tsp_ad5933_init/read_temperature/set_sweep/start_sweep)
@@ -663,11 +667,209 @@ exit_motor:
 	tsp_menu_request_redraw();
 }
 
+/* ===== CCD Test (128-pixel Linear CCD with LCD waveform + AD2 debugging) ===== */
+
+static void action_ccd_test(void)
+{
+	/* Waveform drawing area: 128px wide (x=0..127), 80px tall (y=32..111) */
+#define CCD_WF_X     0
+#define CCD_WF_Y0    32U
+#define CCD_WF_H     80U
+#define CCD_WF_Y1    (CCD_WF_Y0 + CCD_WF_H - 1)   /* 111 */
+
+	ccd_data_t ccd_raw, ccd_prev;
+	uint8_t    ccd_ch    = CCD1;
+	uint8_t    exp_ms    = 10;
+	uint8_t    redraw    = 1;
+	uint16_t   max_v, min_v;
+	uint32_t   sum_v;
+	uint8_t    i;
+	uint8_t    tick      = 0;
+	uint8_t    cont_mode = 1;   /* 1=continuous capture, 0=single-shot */
+	uint8_t    captured;        /* set when new data is read this loop */
+
+	tsp_ccd_init();
+	tsp_ccd_set_exposure(exp_ms);
+
+	/* Clear previous frame buffer */
+	for (i = 0; i < CCD_PIXELS; i++) {
+		ccd_prev[i] = 0xFFFF;  /* impossible value → force first draw */
+		ccd_raw[i]  = 0;
+	}
+
+	/* ─── Draw static UI ─── */
+	tsp_tft18_clear(BLACK);
+	tsp_tft18_show_str_color(0, 0, (uint8_t *)"CCD Test 128px", YELLOW, BLUE);
+	tsp_tft18_draw_line_h(0, 16, 160, BLUE);
+
+	/* Waveform bounding box: left edge at x=0, pixels at x=0..127 inside.
+	 * Frame width=128 covers all 128 CCD pixels, height=81 covers y=31..111. */
+	tsp_tft18_draw_frame(CCD_WF_X, CCD_WF_Y0 - 1,
+		CCD_PIXELS, CCD_WF_H + 1, DARKGREY);
+
+	/* Bottom hints */
+	tsp_tft18_show_str_color(0, 7, (uint8_t *)"S0/S1:Exp S2:Ch", GRAY1, BLACK);
+	tsp_tft18_show_str_color(108, 7, (uint8_t *)"PUSH:exit", GRAY1, BLACK);
+
+	tsp_encoder_enable();
+
+	while (1) {
+		tsp_key_scan();
+
+		/* ─── Key handling (capture edge-triggered states first) ─── */
+		{
+			uint8_t k_s0 = tsp_key_pressed(KEY_S0);
+			uint8_t k_s1 = tsp_key_pressed(KEY_S1);
+			uint8_t k_s2 = tsp_key_pressed(KEY_S2);
+
+			if (tsp_key_pressed(KEY_PUSH)) goto exit_ccd;
+
+			/* Encoder: toggle continuous / single-shot */
+			{
+				int32_t enc = tsp_encoder_get_count();
+				if (enc != 0) {
+					cont_mode = !cont_mode;
+					redraw = 1;
+					if (!cont_mode) {
+						/* Switching to SNGL: invalidate prev to force full redraw on next capture */
+						for (i = 0; i < CCD_PIXELS; i++) ccd_prev[i] = 0xFFFF;
+					}
+					tsp_encoder_reset();
+				}
+			}
+
+			/* S0: exposure -1ms (min 1ms) */
+			if (k_s0) { if (exp_ms > 1) { exp_ms--; tsp_ccd_set_exposure(exp_ms); redraw = 1; } }
+			/* S1: exposure +1ms (max 100ms) */
+			if (k_s1) { if (exp_ms < 100) { exp_ms++; tsp_ccd_set_exposure(exp_ms); redraw = 1; } }
+			/* S2: toggle CCD channel (1↔2) */
+			if (k_s2) {
+				ccd_ch = (ccd_ch == CCD1) ? CCD2 : CCD1;
+				for (i = 0; i < CCD_PIXELS; i++) ccd_prev[i] = 0xFFFF;
+				redraw = 1;
+			}
+
+			/* ─── Capture ───
+			 * CONT mode: capture every loop for live waveform.
+			 * SNGL mode: capture once on S0/S1/S2 key press only. */
+			captured = 0;
+			if (cont_mode) {
+				tsp_ccd_snapshot(ccd_ch, ccd_raw);
+				captured = 1;
+			} else if (k_s0 || k_s1 || k_s2) {
+				/* Single-shot: user key triggers one capture */
+				tsp_ccd_snapshot(ccd_ch, ccd_raw);
+				captured = 1;
+			}
+		}
+
+		/* Compute statistics if we have fresh data */
+		if (captured) {
+			max_v = 0;
+			min_v = 4095;
+			sum_v = 0;
+			for (i = 0; i < CCD_PIXELS; i++) {
+				if (ccd_raw[i] > max_v) max_v = ccd_raw[i];
+				if (ccd_raw[i] < min_v) min_v = ccd_raw[i];
+				sum_v += ccd_raw[i];
+			}
+		}
+
+		/* ─── Incremental LCD text update ─── */
+		if (redraw) {
+			char buf[21];
+			uint8_t p = 0;
+
+			/* Row 1: channel, exposure, mode (C/S) */
+			buf[p++] = 'C'; buf[p++] = 'H'; buf[p++] = (ccd_ch == CCD1) ? '1' : '2';
+			buf[p++] = ' '; buf[p++] = 'E'; buf[p++] = ':';
+			if (exp_ms >= 100) { buf[p++] = '1'; buf[p++] = '0'; buf[p++] = '0'; }
+			else if (exp_ms >= 10) { buf[p++] = '0' + (exp_ms/10); buf[p++] = '0' + (exp_ms%10); }
+			else { buf[p++] = ' '; buf[p++] = '0' + exp_ms; }
+			buf[p++] = 'm'; buf[p++] = 's';
+			buf[p++] = ' ';
+			buf[p++] = (cont_mode) ? 'C' : 'S';  /* Continuous / Single */
+			buf[p++] = ' '; buf[p++] = 'M'; buf[p++] = ':';
+			buf[p++] = '0' + (max_v / 1000) % 10;
+			buf[p++] = '0' + (max_v / 100) % 10;
+			buf[p++] = '0' + (max_v / 10) % 10;
+			buf[p++] = '0' + (max_v % 10);
+			buf[p] = '\0';
+			tsp_tft18_show_str_color(0, 1, (uint8_t *)buf, CYAN, BLACK);
+
+			/* Row 2: min, avg */
+			p = 0;
+			buf[p++] = 'm'; buf[p++] = ':';
+			buf[p++] = '0' + (min_v / 1000) % 10;
+			buf[p++] = '0' + (min_v / 100) % 10;
+			buf[p++] = '0' + (min_v / 10) % 10;
+			buf[p++] = '0' + (min_v % 10);
+			buf[p++] = ' '; buf[p++] = 'A'; buf[p++] = 'v'; buf[p++] = 'g'; buf[p++] = ':';
+			{
+				uint16_t avg = (uint16_t)(sum_v / CCD_PIXELS);
+				buf[p++] = '0' + (avg / 1000) % 10;
+				buf[p++] = '0' + (avg / 100) % 10;
+				buf[p++] = '0' + (avg / 10) % 10;
+				buf[p++] = '0' + (avg % 10);
+			}
+			while (p < 20) buf[p++] = ' ';
+			buf[20] = '\0';
+			tsp_tft18_show_str_color(0, 2, (uint8_t *)buf, CYAN, BLACK);
+
+			/* Mode indicator at row 2 right side */
+			if (cont_mode)
+				tsp_tft18_show_str_color(120, 2, (uint8_t *)"CONT", GREEN, BLACK);
+			else
+				tsp_tft18_show_str_color(120, 2, (uint8_t *)"SNGL", YELLOW, BLACK);
+
+			redraw = 0;
+		}
+
+		/* ─── Draw waveform (only when new data captured) ─── */
+		if (captured) {
+			for (i = 0; i < CCD_PIXELS; i++) {
+				uint8_t y_new = CCD_WF_Y1 -
+					(uint8_t)(((uint32_t)ccd_raw[i] * CCD_WF_H) / 4096U);
+				uint8_t y_old;
+
+				if (ccd_prev[i] == 0xFFFF) {
+					/* First draw after channel switch: no erasure needed */
+					tsp_tft18_draw_pixel(CCD_WF_X + i, y_new, CYAN);
+				} else {
+					y_old = CCD_WF_Y1 -
+						(uint8_t)(((uint32_t)ccd_prev[i] * CCD_WF_H) / 4096U);
+					if (y_new != y_old) {
+						/* Erase old pixel, draw new */
+						tsp_tft18_draw_pixel(CCD_WF_X + i, y_old, BLACK);
+						tsp_tft18_draw_pixel(CCD_WF_X + i, y_new, CYAN);
+					}
+					/* else: pixel at same position, no change needed */
+				}
+				ccd_prev[i] = ccd_raw[i];
+			}
+		}
+
+		/* ─── Periodic: refresh status info every ~500ms ─── */
+		tick++;
+		if (tick >= 50) {
+			tick = 0;
+			/* Force info line refresh */
+			redraw = 1;
+		}
+
+		delay_1ms(10);
+	}
+
+exit_ccd:
+	tsp_encoder_disable();
+	tsp_menu_request_redraw();
+}
+
 /* ===== Main Menu ===== */
 
 static tsp_menu_item_t main_menu[] = {
 	{"K230 Test",      action_k230_test},
-	{"DDS Test",       action_dds_test},
+	{"CCD Test",       action_ccd_test},
 	{"AD5933 Test",    action_ad5933_test},
 	{"Motor Test",     action_motor_test},
 };

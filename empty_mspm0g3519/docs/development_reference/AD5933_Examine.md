@@ -113,7 +113,7 @@ Z_unknown = 1 / (GF × Magnitude_unknown)
 | 第二步 | LCD Row 1 | **`C: B0 08`** | P2：CTRL_H 写入正确 | ✅ |
 | 第三步 | LCD Row 2 | **`T: 2x.xC`**，触摸上升 | P6：温度掩码+符号扩展 | ✅ |
 | 第四步 | AD2 Scope CH1 | **1.000 kHz** 正弦波，~2Vpp | P3：频率字公式 | ✅ |
-| 第五步 | AD2 CH1+CH2 + LCD | CH2 有正弦波，LCD Mag **非零稳定** | 模拟链路完整 | ⏳ |
+| 第五步 | AD2 CH1+CH2 + LCD | CH2 有正弦波，LCD Mag **非零稳定** | 模拟链路完整 | ✅ |
 
 ---
 

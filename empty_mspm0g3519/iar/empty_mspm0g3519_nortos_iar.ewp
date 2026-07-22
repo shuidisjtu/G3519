@@ -1173,6 +1173,24 @@
         <file>
             <name>$PROJ_DIR$\..\NUEDC2025\tsp_k230.h</name>
         </file>
+        <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_ad5933.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_ad5933.h</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_motor.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_motor.h</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_dds.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_dds.h</name>
+        </file>
     </group>
     <group>
         <name>SysConfig Generated Files</name>

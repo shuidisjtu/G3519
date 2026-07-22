@@ -224,7 +224,7 @@ void tsp_ad5933_init(void)
 
     /* Set external clock (MCLK = X2 16MHz), standby mode */
     tsp_ad5933_write_reg(AD5933_REG_CTRL_H,
-        (uint8_t)((AD5933_CTRL_STANDBY >> 8) | AD5933_VOLT_2000MV | AD5933_PGA_X1));
+        (uint8_t)((AD5933_CTRL_STANDBY | AD5933_VOLT_2000MV | AD5933_PGA_X1) >> 8));
     tsp_ad5933_write_reg(AD5933_REG_CTRL_L, AD5933_CLK_EXTERNAL);
 }
 
@@ -233,7 +233,7 @@ void tsp_ad5933_start_sweep(void)
 {
     /* Initialize with start frequency */
     tsp_ad5933_write_reg(AD5933_REG_CTRL_H,
-        (uint8_t)((AD5933_CTRL_INIT_FREQ >> 8) | AD5933_VOLT_2000MV | AD5933_PGA_X1));
+        (uint8_t)((AD5933_CTRL_INIT_FREQ | AD5933_VOLT_2000MV | AD5933_PGA_X1) >> 8));
     tsp_ad5933_write_reg(AD5933_REG_CTRL_L, AD5933_CLK_EXTERNAL);
 
     /* Wait for initialization to complete (status bit?) */
@@ -241,7 +241,7 @@ void tsp_ad5933_start_sweep(void)
 
     /* Start sweep */
     tsp_ad5933_write_reg(AD5933_REG_CTRL_H,
-        (uint8_t)((AD5933_CTRL_START_SWEEP >> 8) | AD5933_VOLT_2000MV | AD5933_PGA_X1));
+        (uint8_t)((AD5933_CTRL_START_SWEEP | AD5933_VOLT_2000MV | AD5933_PGA_X1) >> 8));
     tsp_ad5933_write_reg(AD5933_REG_CTRL_L, AD5933_CLK_EXTERNAL);
 }
 

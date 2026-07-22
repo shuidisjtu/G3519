@@ -94,6 +94,22 @@ extern "C" {
 bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 
 
+
+/* Defines for I2C_AD5933 */
+#define I2C_AD5933_INST                                                     I2C1
+#define I2C_AD5933_INST_IRQHandler                               I2C1_IRQHandler
+#define I2C_AD5933_INST_INT_IRQN                                   I2C1_INT_IRQn
+#define I2C_AD5933_BUS_SPEED_HZ                                           100000
+#define GPIO_I2C_AD5933_SDA_PORT                                           GPIOA
+#define GPIO_I2C_AD5933_SDA_PIN                                   DL_GPIO_PIN_30
+#define GPIO_I2C_AD5933_IOMUX_SDA                                 (IOMUX_PINCM5)
+#define GPIO_I2C_AD5933_IOMUX_SDA_FUNC                  IOMUX_PINCM5_PF_I2C1_SDA
+#define GPIO_I2C_AD5933_SCL_PORT                                           GPIOA
+#define GPIO_I2C_AD5933_SCL_PIN                                   DL_GPIO_PIN_29
+#define GPIO_I2C_AD5933_IOMUX_SCL                                 (IOMUX_PINCM4)
+#define GPIO_I2C_AD5933_IOMUX_SCL_FUNC                  IOMUX_PINCM4_PF_I2C1_SCL
+
+
 /* Defines for UART_0 */
 #define UART_0_INST                                                        UART0
 #define UART_0_INST_FREQUENCY                                            4000000
@@ -168,6 +184,12 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 /* Defines for LCD_DC: GPIOB.29 with pinCMx 66 on package pin 30 */
 #define PORTB_LCD_DC_PIN                                        (DL_GPIO_PIN_29)
 #define PORTB_LCD_DC_IOMUX                                       (IOMUX_PINCM66)
+/* Defines for M1DIR: GPIOB.4 with pinCMx 17 on package pin 25 */
+#define PORTB_M1DIR_PIN                                          (DL_GPIO_PIN_4)
+#define PORTB_M1DIR_IOMUX                                        (IOMUX_PINCM17)
+/* Defines for M2DIR: GPIOB.2 with pinCMx 15 on package pin 23 */
+#define PORTB_M2DIR_PIN                                          (DL_GPIO_PIN_2)
+#define PORTB_M2DIR_IOMUX                                        (IOMUX_PINCM15)
 /* Port definition for Pin Group PORTA */
 #define PORTA_PORT                                                       (GPIOA)
 
@@ -217,6 +239,15 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 /* Defines for S1: GPIOC.0 with pinCMx 74 on package pin 56 */
 #define PORTC_S1_PIN                                             (DL_GPIO_PIN_0)
 #define PORTC_S1_IOMUX                                           (IOMUX_PINCM74)
+/* Defines for DDS_SCLK: GPIOC.2 with pinCMx 76 on package pin 65 */
+#define PORTC_DDS_SCLK_PIN                                       (DL_GPIO_PIN_2)
+#define PORTC_DDS_SCLK_IOMUX                                     (IOMUX_PINCM76)
+/* Defines for DDS_SDATA: GPIOC.3 with pinCMx 77 on package pin 66 */
+#define PORTC_DDS_SDATA_PIN                                      (DL_GPIO_PIN_3)
+#define PORTC_DDS_SDATA_IOMUX                                    (IOMUX_PINCM77)
+/* Defines for DDS_FSYNC: GPIOC.24 with pinCMx 83 on package pin 62 */
+#define PORTC_DDS_FSYNC_PIN                                     (DL_GPIO_PIN_24)
+#define PORTC_DDS_FSYNC_IOMUX                                    (IOMUX_PINCM83)
 
 
 
@@ -229,6 +260,7 @@ void SYSCFG_DL_GPIO_init(void);
 void SYSCFG_DL_SYSCTL_init(void);
 
 bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
+void SYSCFG_DL_I2C_AD5933_init(void);
 void SYSCFG_DL_UART_0_init(void);
 void SYSCFG_DL_UART_K230_init(void);
 void SYSCFG_DL_LCD_init(void);

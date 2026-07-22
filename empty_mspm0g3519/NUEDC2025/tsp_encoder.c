@@ -102,3 +102,33 @@ void tsp_encoder_reset(void)
     g_enc_last_tick = sys_tick_counter;
     __set_PRIMASK(primask);
 }
+
+/*
+ * tsp_encoder_enable — enable PHA0 (PA14) interrupt and reset count.
+ * Call when entering a mode that uses the encoder (e.g. DDS interactive).
+ */
+void tsp_encoder_enable(void)
+{
+    DL_GPIO_clearInterruptStatus(GPIOA, DL_GPIO_PIN_14);
+    DL_GPIO_enableInterrupt(GPIOA, DL_GPIO_PIN_14);
+
+    /* Enable GROUP1 interrupt for GPIOA at CPUSS level */
+    CPUSS->INT_GROUP[1].ISET = DL_INTERRUPT_GROUP1_GPIOA;
+
+    /* Enable GROUP1 in NVIC */
+    NVIC_EnableIRQ(PORTA_INT_IRQN);
+
+    tsp_encoder_reset();
+}
+
+/*
+ * tsp_encoder_disable — disable PHA0 interrupt and reset count.
+ * Call when leaving encoder-dependent mode to prevent spurious interrupts.
+ */
+void tsp_encoder_disable(void)
+{
+    DL_GPIO_disableInterrupt(GPIOA, DL_GPIO_PIN_14);
+    CPUSS->INT_GROUP[1].ICLR = DL_INTERRUPT_GROUP1_GPIOA;
+    NVIC_DisableIRQ(PORTA_INT_IRQN);
+    tsp_encoder_reset();
+}

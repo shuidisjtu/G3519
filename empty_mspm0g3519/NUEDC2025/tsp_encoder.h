@@ -12,6 +12,8 @@
  */
 
 void tsp_encoder_init(void);
+void tsp_encoder_enable(void);         /* enable PHA0 interrupt + reset count */
+void tsp_encoder_disable(void);        /* disable PHA0 interrupt + reset count */
 int32_t tsp_encoder_get_count(void);   /* accumulated pulse count */
 int16_t tsp_encoder_get_speed(void);   /* speed: pulses per speed interval */
 void    tsp_encoder_reset(void);       /* zero count and speed */

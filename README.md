@@ -4,11 +4,20 @@
 
 ## 功能概览
 
-启动后播放**开机动画**（色彩测试 → 启动信息 → LED 闪烁 + 蜂鸣器短响），然后进入 **TFT LCD 菜单界面**（2026-07-19 精简为 1 项）：
+启动后播放**开机动画**（色彩测试 → 启动信息 → LED 闪烁 + 蜂鸣器短响），然后进入 **TFT LCD 菜单界面**（2026-07-22 共 4 项）：
 
 | 菜单项 | 功能 |
 |---|---|
 | **K230 Test** | K230 视觉模块测试（UART6/J11 双向通信：接收真实 YbProtocol 颜色帧 + S0 发 $SWITCH# 切换颜色阈值，LCD 色块追踪画框） |
+| **CCD Test** | 线阵 CCD 测试（128 像素采集 + LCD 实时波形、连续/单拍模式、双通道切换、曝光调节） |
+| **AD5933 Test** | AD5933 阻抗测量测试（I2C1 通信验证、温度读取、GainFactor 标定、阻抗测量） |
+| **Motor Test** | DRV8874 双电机驱动测试（TIMA0 PWM 20kHz，M1/M2 独立控制，AD2 波形验证） |
+
+> **Motor Test 操作**：S0/S1 调占空比(±5%)、S2 切换方向(FWD↔REV)、编码器左转=M2 右转=M1、PUSH 退出。
+> M1/M2 方向和占空比**独立存储**，切换后另一电机保持运行。
+> **AD2 示波器**：探头接拓展板 **J10**（M1+ M1-）或 **J11**（M2+ M2-），量程 ±25V。
+> **必须打开 SW1 接通电池（VBAT）**才能在输出端看到 PWM 波形。无 VBAT 时用逻辑分析仪接 J14 侧 IN1/IN2 观测 3.3V 逻辑电平。
+> 详见 [`docs/DRV8874_Motor_Use.md`](empty_mspm0g3519/docs/DRV8874_Motor_Use.md)。
 
 > ~~UART Test~~ 已移除：脱机（不接 DAPLink）时 UART0 TX 阻塞导致程序卡死，根因是 NRST=2.5V 临界电压影响 MFCLK 时钟稳定性。仅接 DAPLink 调试时可临时启用以太网 printf 输出。
 
@@ -16,7 +25,8 @@
 
 按键角色：**S0**=上移、**S1**=下移、**S2**=确认、**PUSH**=返回
 
-> **暂未启用的模块**：CCD（无外接模块）、编码器菜单项（编码器驱动已初始化但未加入菜单）。代码保留在工程中，接上硬件后可直接启用。
+> **已封存模块**：DDS Test（AD9833，PC2/PC3 与 CCD 共用，已验证通过，代码保留供信号题启用）。
+> **暂未启用**：MPU6050（无驱动代码）、通用 ADC（J2 五路，无驱动代码）。编码器驱动已初始化但未加入独立菜单项。
 
 ## 硬件连接
 
@@ -28,8 +38,11 @@
 | **TFT LCD** | ST7735 160×128，SPI1（PB30/PB31/PB14），10MHz |
 | **按键** | S0(PA18)、S1(PC0)、S2(PA16)、PUSH(PA12) |
 | **编码器** | PHA0(PA14, 双边沿中断)、PHB0(PA15) |
-| **CCD** | TSL1401 双通道，SI/CLK GPIO + ADC0(PC2/PC3) |
+| **CCD** | 128 像素线阵 CCD 双通道，SI/CLK GPIO + ADC1 序列采样（CCD1: PB18/CH5, CCD2: PB17/CH4） |
+| **MPU6050** | 六轴 IMU（I2C0: PB21-SCL/PB22-SDA, 中断 PC8），盲走航向控制 |
 | **UART** | UART0 调试：MFCLK 4MHz, 115200-8N1，PA10(TX)/PA11(RX)；UART6→K230：BUSCLK 80MHz, 115200，PC11(TX)/PC10(RX)，J11 |
+| **电机驱动** | DRV8874×2（拓展板），TIMA0 PWM 20kHz：PB3(M1 PWM)/PB4(M1 DIR)/PB0(M2 PWM)/PB2(M2 DIR)，nSLEEP=PB1，nFAULT=PA7，需 VBAT(SW1) |
+| **I2C** | I2C1→AD5933：PA29(SCL)/PA30(SDA)，100kHz，J19 桥接 |
 | **调试器** | DAPLink (CMSIS-DAP v2, VID_0D28&PID_0204) |
 | **供电** | USB-C，禁止多路同时供电 |
 
@@ -80,15 +93,17 @@ empty_mspm0g3519/
 │   ├── tsp_common_headfile.h         ← 公共头文件枢纽
 │   ├── tsp_gpio.h / tsp_gpio.c       ← GPIO 宏封装（LED/蜂鸣器/LCD/CCD/按键/编码器）
 │   ├── TSP_TFT18.h / TSP_TFT18.c     ← TFT LCD 驱动（ST7735, 160×128, SPI1）
-│   ├── tsp_ccd.h / tsp_ccd.c         ← TSL1401 线性 CCD 驱动（双通道）[未启用]
+│   ├── tsp_ccd.h / tsp_ccd.c         ← 128 像素线阵 CCD 驱动（双通道，ADC1 序列采样）
 │   └── tsp_menu.h / tsp_menu.c       ← LCD 菜单系统（列表+子菜单+增量重绘）
 └── NUEDC2025/                        ← 应用层驱动
-    ├── tsp_isr.h / tsp_isr.c         ← SysTick 延时 + GROUP1/UART0 中断分发
+    ├── tsp_isr.h / tsp_isr.c         ← SysTick 延时 + GROUP1/UART0/UART6 中断分发
     ├── tsp_key.h / tsp_key.c         ← 4键扫描（20ms 消抖，边沿检测）
     ├── tsp_encoder.h / tsp_encoder.c ← 编码器驱动（PHA0 中断正交解码）
     ├── tsp_uart.h / tsp_uart.c       ← UART0 通信（MFCLK 4MHz, 环形缓冲 RX, printf 重定向）
     ├── tsp_uart_k230.h / tsp_uart_k230.c ← UART6 驱动（K230, BUSCLK 80MHz, 环形缓冲 RX）
-    └── tsp_k230.h / tsp_k230.c       ← K230 YbProtocol 解析（主循环状态机断帧）
+    ├── tsp_k230.h / tsp_k230.c       ← K230 YbProtocol 解析（主循环状态机断帧）
+    ├── tsp_motor.h / tsp_motor.c     ← DRV8874 电机驱动（TIMA0 PWM 20kHz, M1/M2 独立控制）
+    └── tsp_dds.h / tsp_dds.c         ← AD9833 DDS 波形发生器（GPIO bit-bang, 方波/正弦/三角波）
 ```
 
 K230 侧 MicroPython 脚本位于 `empty_mspm0g3519/k230_scripts/`（CanMV IDE 中打开运行）：

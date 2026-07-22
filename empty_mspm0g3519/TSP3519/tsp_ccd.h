@@ -3,15 +3,15 @@
 
 #include "tsp_common_headfile.h"
 
-/* ===== TSL1401 Linear CCD Driver for MSPM0G3519 =====
+/* ===== 128-Pixel Linear CCD Driver for MSPM0G3519 =====
  * Supports dual CCD sensors (CCD1 and CCD2).
- * Adapted from HSP TSL1401 driver pattern:
- *   - Bit-banged SI/CLK via GPIO macros from tsp_gpio.h
- *   - ADC software-triggered read per pixel
- *   - Hardware integration time controlled by delay after flush
+ * Pin mapping (verified against M0G3519 schematics):
+ *   CCD1(J3):  AO=PB18(ADC1 CH5), SI=PC9,  CLK=PB20
+ *   CCD2(J17): AO=PB17(ADC1 CH4), SI=PC4,  CLK=PC5
+ * ADC1 sequence mode: MEM0→CH5, MEM1→CH4, manual sample, software trigger.
  */
 
-#define CCD_PIXELS  128U              /* TSL1401 pixel count */
+#define CCD_PIXELS  128U              /* pixel count */
 
 /* CCD channel IDs */
 #define CCD1        1
