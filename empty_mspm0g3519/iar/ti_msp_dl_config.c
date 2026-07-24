@@ -54,7 +54,6 @@ SYSCONFIG_WEAK void SYSCFG_DL_init(void)
     SYSCFG_DL_SYSCTL_init();
     SYSCFG_DL_I2C_AD5933_init();
     SYSCFG_DL_UART_0_init();
-    SYSCFG_DL_UART_K230_init();
     SYSCFG_DL_LCD_init();
     SYSCFG_DL_SYSTICK_init();
     /* Ensure backup structures have no valid state */
@@ -92,7 +91,6 @@ SYSCONFIG_WEAK void SYSCFG_DL_initPower(void)
     DL_GPIO_reset(GPIOC);
     DL_I2C_reset(I2C_AD5933_INST);
     DL_UART_Main_reset(UART_0_INST);
-    DL_UART_Main_reset(UART_K230_INST);
     DL_SPI_reset(LCD_INST);
 
 
@@ -101,7 +99,6 @@ SYSCONFIG_WEAK void SYSCFG_DL_initPower(void)
     DL_GPIO_enablePower(GPIOC);
     DL_I2C_enablePower(I2C_AD5933_INST);
     DL_UART_Main_enablePower(UART_0_INST);
-    DL_UART_Main_enablePower(UART_K230_INST);
     DL_SPI_enablePower(LCD_INST);
 
     delay_cycles(POWER_STARTUP_DELAY);
@@ -130,10 +127,6 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
         GPIO_UART_0_IOMUX_TX, GPIO_UART_0_IOMUX_TX_FUNC);
     DL_GPIO_initPeripheralInputFunction(
         GPIO_UART_0_IOMUX_RX, GPIO_UART_0_IOMUX_RX_FUNC);
-    DL_GPIO_initPeripheralOutputFunction(
-        GPIO_UART_K230_IOMUX_TX, GPIO_UART_K230_IOMUX_TX_FUNC);
-    DL_GPIO_initPeripheralInputFunction(
-        GPIO_UART_K230_IOMUX_RX, GPIO_UART_K230_IOMUX_RX_FUNC);
 
     DL_GPIO_initPeripheralInputFunction(
         GPIO_LCD_IOMUX_POCI, GPIO_LCD_IOMUX_POCI_FUNC);
@@ -145,17 +138,9 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
 
     DL_GPIO_initDigitalOutput(PORTB_LED_IOMUX);
 
-    DL_GPIO_initDigitalOutput(PORTB_CCD_CLK1_IOMUX);
-
-    DL_GPIO_initDigitalOutput(PORTB_SLEEP_IOMUX);
-
     DL_GPIO_initDigitalOutput(PORTB_LCD_CS_IOMUX);
 
     DL_GPIO_initDigitalOutput(PORTB_LCD_DC_IOMUX);
-
-    DL_GPIO_initDigitalOutput(PORTB_M1DIR_IOMUX);
-
-    DL_GPIO_initDigitalOutput(PORTB_M2DIR_IOMUX);
 
     DL_GPIO_initDigitalInputFeatures(PORTA_S0_IOMUX,
 		 DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_NONE,
@@ -179,19 +164,9 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
 		 DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_NONE,
 		 DL_GPIO_HYSTERESIS_DISABLE, DL_GPIO_WAKEUP_DISABLE);
 
-    DL_GPIO_initDigitalInputFeatures(PORTA_FAULT_IOMUX,
-		 DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_NONE,
-		 DL_GPIO_HYSTERESIS_DISABLE, DL_GPIO_WAKEUP_DISABLE);
-
     DL_GPIO_initDigitalOutput(PORTA_LCD_RST_IOMUX);
 
     DL_GPIO_initDigitalOutput(PORTA_LCD_BL_IOMUX);
-
-    DL_GPIO_initDigitalOutput(PORTC_CCD_SI1_IOMUX);
-
-    DL_GPIO_initDigitalOutput(PORTC_CCD_SI2_IOMUX);
-
-    DL_GPIO_initDigitalOutput(PORTC_CCD_CLK2_IOMUX);
 
     DL_GPIO_initDigitalInputFeatures(PORTC_S1_IOMUX,
 		 DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_NONE,
@@ -213,29 +188,15 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
     DL_GPIO_clearInterruptStatus(PORTA_PORT, PORTA_PHA0_PIN);
     DL_GPIO_enableInterrupt(PORTA_PORT, PORTA_PHA0_PIN);
     DL_GPIO_clearPins(PORTB_PORT, PORTB_LED_PIN |
-		PORTB_CCD_CLK1_PIN |
-		PORTB_SLEEP_PIN |
 		PORTB_LCD_CS_PIN |
-		PORTB_LCD_DC_PIN |
-		PORTB_M1DIR_PIN |
-		PORTB_M2DIR_PIN);
+		PORTB_LCD_DC_PIN);
     DL_GPIO_enableOutput(PORTB_PORT, PORTB_LED_PIN |
-		PORTB_CCD_CLK1_PIN |
-		PORTB_SLEEP_PIN |
 		PORTB_LCD_CS_PIN |
-		PORTB_LCD_DC_PIN |
-		PORTB_M1DIR_PIN |
-		PORTB_M2DIR_PIN);
-    DL_GPIO_clearPins(PORTC_PORT, PORTC_CCD_SI1_PIN |
-		PORTC_CCD_SI2_PIN |
-		PORTC_CCD_CLK2_PIN |
-		PORTC_DDS_SCLK_PIN |
+		PORTB_LCD_DC_PIN);
+    DL_GPIO_clearPins(PORTC_PORT, PORTC_DDS_SCLK_PIN |
 		PORTC_DDS_SDATA_PIN |
 		PORTC_DDS_FSYNC_PIN);
-    DL_GPIO_enableOutput(PORTC_PORT, PORTC_CCD_SI1_PIN |
-		PORTC_CCD_SI2_PIN |
-		PORTC_CCD_CLK2_PIN |
-		PORTC_DDS_SCLK_PIN |
+    DL_GPIO_enableOutput(PORTC_PORT, PORTC_DDS_SCLK_PIN |
 		PORTC_DDS_SDATA_PIN |
 		PORTC_DDS_FSYNC_PIN);
 
@@ -414,41 +375,6 @@ SYSCONFIG_WEAK void SYSCFG_DL_UART_0_init(void)
 
 
     DL_UART_Main_enable(UART_0_INST);
-}
-static const DL_UART_Main_ClockConfig gUART_K230ClockConfig = {
-    .clockSel    = DL_UART_MAIN_CLOCK_BUSCLK,
-    .divideRatio = DL_UART_MAIN_CLOCK_DIVIDE_RATIO_1
-};
-
-static const DL_UART_Main_Config gUART_K230Config = {
-    .mode        = DL_UART_MAIN_MODE_NORMAL,
-    .direction   = DL_UART_MAIN_DIRECTION_TX_RX,
-    .flowControl = DL_UART_MAIN_FLOW_CONTROL_NONE,
-    .parity      = DL_UART_MAIN_PARITY_NONE,
-    .wordLength  = DL_UART_MAIN_WORD_LENGTH_8_BITS,
-    .stopBits    = DL_UART_MAIN_STOP_BITS_ONE
-};
-
-SYSCONFIG_WEAK void SYSCFG_DL_UART_K230_init(void)
-{
-    DL_UART_Main_setClockConfig(UART_K230_INST, (DL_UART_Main_ClockConfig *) &gUART_K230ClockConfig);
-
-    DL_UART_Main_init(UART_K230_INST, (DL_UART_Main_Config *) &gUART_K230Config);
-    /*
-     * Configure baud rate by setting oversampling and baud rate divisors.
-     *  Target baud rate: 115200
-     *  Actual baud rate: 115190.78
-     */
-    DL_UART_Main_setOversampling(UART_K230_INST, DL_UART_OVERSAMPLING_RATE_16X);
-    DL_UART_Main_setBaudRateDivisor(UART_K230_INST, UART_K230_IBRD_80_MHZ_115200_BAUD, UART_K230_FBRD_80_MHZ_115200_BAUD);
-
-
-    /* Configure Interrupts */
-    DL_UART_Main_enableInterrupt(UART_K230_INST,
-                                 DL_UART_MAIN_INTERRUPT_RX);
-
-
-    DL_UART_Main_enable(UART_K230_INST);
 }
 
 static const DL_SPI_Config gLCD_config = {
