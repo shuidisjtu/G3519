@@ -1,0 +1,58 @@
+# === IAR EWARM Build Outputs ===
+Debug/
+settings/
+
+# === IAR User-specific Files ===
+# Editor layout/tabs (user preference)
+*.ewt
+# C-RUN runtime analysis
+*.crun
+# Debug desktop layout
+*.dbgdt
+# Debugger Nexus XML
+*.dnx
+# Workspace desktop layout
+*.wsdt
+
+# === Build Artifacts (generated) ===
+*.o
+*.out
+*.sim
+*.map
+*.bin
+*.hex
+*.elf
+*.axf
+
+# === Browse Info (generated) ===
+*.pbi
+*.pbd
+*.pbw
+*.xcl
+*.dep
+
+# === Ninja Build Cache ===
+.ninja_*
+build.ninja
+
+# === OS Files ===
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# === Claude Code ===
+.claude/
+
+# === K230 SD Card Firmware (managed separately) ===
+sdcard/
+
+# === Local Reference Only (not tracked) ===
+# 亚博官方 MSPM0G3507 CCS 例程，仅本地参考，见 docs/K230_Vision_Module_Use.md §4
+empty_mspm0g3519/01_k230_color_detect/
+
+# === Editor / IDE ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
