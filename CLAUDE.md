@@ -43,8 +43,9 @@ empty_mspm0g3519/
 │   ├── tsp_encoder.h/.c               ← 编码器（PHA0 中断正交解码，20ms 速度）
 │   ├── tsp_uart.h/.c                  ← UART0（MFCLK 4MHz, 115200-8N1, 环形缓冲 RX）
 │   ├── tsp_ad5933.h/.c                ← AD5933 阻抗测量（I2C1, 100kHz, 温度+扫频）
-│   └── tsp_dds.h/.c                   ← AD9833 DDS 波形发生器（GPIO bit-bang, 方波/正弦/三角波）
-│   └── tsp_adc.h/.c                   ← 通用 ADC（J2 五路, ADC0+ADC1, 电压/频率测量）
+│   ├── tsp_dds.h/.c                   ← AD9833 DDS 波形发生器（GPIO bit-bang, 方波/正弦/三角波）
+│   ├── tsp_adc.h/.c                   ← 通用 ADC（J2 五路, ADC0+ADC1, 电压/频率测量）
+│   └── tsp_ad8302.h/.c                ← [封存] AD8302 幅相检测（需 RF 信号，输入网络未焊）
 └── docs/                              ← 硬件文档与项目进度
     ├── development_reference/         ← 开发参考文档
     └── project_schedule/              ← 项目进度跟踪

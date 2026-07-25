@@ -57,12 +57,14 @@ static void action_dds_test(void)
 	uint8_t  last_wave = 0xFF;
 	uint32_t last_freq = 0;
 
+	uint8_t  keep_output = 0;
+
 	/* Draw static elements */
 	tsp_tft18_clear(BLACK);
 	tsp_tft18_show_str_color(0, 0, (uint8_t *)"AD9833 DDS Generator", YELLOW, BLUE);
 	tsp_tft18_draw_line_h(0, 16, 160, BLUE);
 	tsp_tft18_show_str_color(0, 6, (uint8_t *)"S0/S1:Wave  Enc:Freq", GRAY1, BLACK);
-	tsp_tft18_show_str_color(0, 7, (uint8_t *)"PUSH to exit", GRAY1, BLACK);
+	tsp_tft18_show_str_color(0, 7, (uint8_t *)"PUSH:Exit  S2:Keep  ", GRAY1, BLACK);
 
 	/* Start DDS (polled encoder — no ISR needed) */
 	tsp_dds_set_output(freq, tsp_dds_wave_ctrl[wave_idx]);
@@ -93,6 +95,7 @@ static void action_dds_test(void)
 				/* Keys */
 				tsp_key_scan();
 				if (tsp_key_pressed(KEY_PUSH)) break;
+				if (tsp_key_pressed(KEY_S2)) { keep_output = 1; break; }
 
 				if (tsp_key_pressed(KEY_S0)) {
 					wave_idx = (wave_idx == 0) ? DDS_WAVE_COUNT - 1 : wave_idx - 1;
@@ -162,7 +165,8 @@ static void action_dds_test(void)
 	}
 
 	/* Cleanup */
-	tsp_dds_stop();
+	if (!keep_output)
+		tsp_dds_stop();
 	tsp_menu_request_redraw();
 }
 
@@ -335,8 +339,9 @@ static void action_ad5933_test(void)
 	int16_t real, imag;
 	float mag;
 	float gain_factor = 0.0f;
+	float cal_mag_saved = 0.0f;
 
-	#define CAL_RESISTANCE  18000.0f
+	#define CAL_RESISTANCE  220.0f
 
 	tsp_tft18_clear(BLACK);
 	tsp_tft18_show_str_color(0, 0, (uint8_t *)"AD5933 Impedance", YELLOW, BLUE);
@@ -360,7 +365,7 @@ static void action_ad5933_test(void)
 	}
 
 	/* ===== Calibration phase ===== */
-	tsp_tft18_show_str_color(0, 3, (uint8_t *)"Cal: 18000 Ohm", CYAN, BLACK);
+	tsp_tft18_show_str_color(0, 3, (uint8_t *)"Cal: 220 Ohm  ", CYAN, BLACK);
 	tsp_tft18_show_str_color(0, 4, (uint8_t *)"Connect Rcal to J15", WHITE, BLACK);
 	tsp_tft18_show_str_color(0, 5, (uint8_t *)"S2=Calibrate", GRAY1, BLACK);
 
@@ -392,6 +397,7 @@ static void action_ad5933_test(void)
 
 		if (cal_mag > 1.0f) {
 			gain_factor = 1.0f / (CAL_RESISTANCE * cal_mag);
+			cal_mag_saved = cal_mag;
 		}
 	}
 
@@ -414,7 +420,21 @@ static void action_ad5933_test(void)
 	tsp_ad5933_start_sweep();
 
 	/* Redraw static labels (pad to 20 chars to clear calibration text) */
+	tsp_tft18_show_str_color(0, 2, (uint8_t *)"cM:       M:        ", CYAN, BLACK);
 	tsp_tft18_show_str_color(0, 3, (uint8_t *)"Freq: 1000 Hz       ", WHITE, BLACK);
+
+	/* Show cal_mag once */
+	{
+		char buf[6]; uint8_t p = 0;
+		uint16_t cm = (uint16_t)(cal_mag_saved + 0.5f);
+		buf[p++] = '0' + (cm / 10000) % 10;
+		buf[p++] = '0' + (cm / 1000) % 10;
+		buf[p++] = '0' + (cm / 100) % 10;
+		buf[p++] = '0' + (cm / 10) % 10;
+		buf[p++] = '0' + (cm % 10);
+		buf[p] = '\0';
+		tsp_tft18_show_str_color(24, 2, (uint8_t *)buf, WHITE, BLACK);
+	}
 	tsp_tft18_show_str_color(0, 4, (uint8_t *)"Real:               ", CYAN, BLACK);
 	tsp_tft18_show_str_color(0, 5, (uint8_t *)"Imag:               ", CYAN, BLACK);
 	if (gain_factor > 0.0f) {
@@ -443,6 +463,19 @@ static void action_ad5933_test(void)
 			real = tsp_ad5933_read_real();
 			imag = tsp_ad5933_read_imag();
 			mag  = sqrtf((float)real * (float)real + (float)imag * (float)imag);
+
+			/* Display current Mag on Row 2 (after "M:" at x=96) */
+			{
+				char buf[6]; uint8_t p = 0;
+				uint16_t m = (uint16_t)(mag + 0.5f);
+				buf[p++] = '0' + (m / 10000) % 10;
+				buf[p++] = '0' + (m / 1000) % 10;
+				buf[p++] = '0' + (m / 100) % 10;
+				buf[p++] = '0' + (m / 10) % 10;
+				buf[p++] = '0' + (m % 10);
+				buf[p] = '\0';
+				tsp_tft18_show_str_color(96, 2, (uint8_t *)buf, WHITE, BLACK);
+			}
 
 			/* Display Real */
 			{
@@ -502,7 +535,7 @@ static void action_ad5933_test(void)
 			 * REPEAT_FREQ re-runs DFT without re-initializing the DDS,
 			 * per AD5933 datasheet Figure 27. */
 			tsp_ad5933_write_reg(AD5933_REG_CTRL_H,
-				(uint8_t)((AD5933_CTRL_REPEAT_FREQ | AD5933_VOLT_2000MV | AD5933_PGA_X1) >> 8));
+				(uint8_t)((AD5933_CTRL_REPEAT_FREQ | AD5933_VOLT_200MV | AD5933_PGA_X1) >> 8));
 			tsp_ad5933_write_reg(AD5933_REG_CTRL_L, AD5933_CLK_EXTERNAL);
 		}
 	}
