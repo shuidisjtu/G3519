@@ -44,4 +44,9 @@ uint16_t tsp_adc_read_mv(void);
 uint16_t tsp_adc_read_avg_mv(uint8_t n);
 void     tsp_adc_measure(tsp_adc_meas_t *out);
 
+/* Burst sample into internal buffer, returns pointer to raw 12-bit values.
+ * count: number of samples (max ADC_FREQ_BUF_SIZE).
+ * delay: delay_cycles multiplier between samples (0=fastest ~4.9us/sample). */
+uint16_t *tsp_adc_burst_sample(uint16_t count, uint16_t delay);
+
 #endif

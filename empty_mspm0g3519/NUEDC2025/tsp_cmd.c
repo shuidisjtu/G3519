@@ -1,6 +1,7 @@
 #include "tsp_cmd.h"
 #include "tsp_adc.h"
 #include "tsp_dds.h"
+#include "tsp_fft.h"
 #include <string.h>
 
 /* ─── Transport callbacks ─── */
@@ -151,6 +152,38 @@ static void cmd_dds(char *tokens[], uint8_t count)
     tx_ok(NULL);
 }
 
+static void cmd_fft(char *tokens[], uint8_t count)
+{
+    char buf[48];
+    tsp_fft_result_t res;
+
+    if (count < 2) { tx_err("usage: FFT,<ch 1-5>[,FAST|MED|SLOW]"); return; }
+
+    uint32_t ch = str_to_u32(tokens[1]);
+    if (ch < 1 || ch > 5) { tx_err("ch 1-5"); return; }
+
+    uint16_t speed = FFT_FS_MED;
+    if (count >= 3) {
+        if      (streqi(tokens[2], "FAST")) speed = FFT_FS_FAST;
+        else if (streqi(tokens[2], "MED"))  speed = FFT_FS_MED;
+        else if (streqi(tokens[2], "SLOW")) speed = FFT_FS_SLOW;
+    }
+
+    tsp_fft_analyze((uint8_t)(ch - 1), speed, &res);
+
+    /* Response: OK,freq_x10,amp_mv,thd_x10,dc_mv,fs_hz */
+    {
+        char tmp[12];
+        buf[0] = '\0';
+        u32_to_str(res.freq_x10, tmp, sizeof(tmp)); strcat(buf, tmp); strcat(buf, ",");
+        u32_to_str(res.amp_mv, tmp, sizeof(tmp));    strcat(buf, tmp); strcat(buf, ",");
+        u32_to_str(res.thd_x10, tmp, sizeof(tmp));   strcat(buf, tmp); strcat(buf, ",");
+        u32_to_str(res.dc_mv, tmp, sizeof(tmp));     strcat(buf, tmp); strcat(buf, ",");
+        u32_to_str(res.fs_hz, tmp, sizeof(tmp));     strcat(buf, tmp);
+    }
+    tx_ok(buf);
+}
+
 /* ─── Command dispatch ─── */
 
 static void process_line(char *line)
@@ -164,6 +197,7 @@ static void process_line(char *line)
     else if (streqi(tokens[0], "ADC"))  cmd_adc(tokens, count);
     else if (streqi(tokens[0], "FREQ")) cmd_freq(tokens, count);
     else if (streqi(tokens[0], "DDS"))  cmd_dds(tokens, count);
+    else if (streqi(tokens[0], "FFT"))  cmd_fft(tokens, count);
     else    tx_err("unknown cmd");
 }
 

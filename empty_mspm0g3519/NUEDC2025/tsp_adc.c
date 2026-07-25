@@ -182,3 +182,23 @@ void tsp_adc_measure(tsp_adc_meas_t *out)
     out->vpp_mv  = out->vmax_mv - out->vmin_mv;
     out->dc_mv   = (out->vmax_mv + out->vmin_mv) / 2;
 }
+
+uint16_t *tsp_adc_burst_sample(uint16_t count, uint16_t delay)
+{
+    uint16_t i;
+    if (count > ADC_FREQ_BUF_SIZE) count = ADC_FREQ_BUF_SIZE;
+
+    for (i = 0; i < count; i++) {
+        DL_ADC12_startConversion(g_cur_adc);
+        while (!DL_ADC12_getRawInterruptStatus(
+                   g_cur_adc, DL_ADC12_INTERRUPT_MEM0_RESULT_LOADED))
+            ;
+        DL_ADC12_clearInterruptStatus(
+            g_cur_adc, DL_ADC12_INTERRUPT_MEM0_RESULT_LOADED);
+        g_freq_buf[i] = DL_ADC12_getMemResult(g_cur_adc, DL_ADC12_MEM_IDX_0);
+        DL_ADC12_enableConversions(g_cur_adc);
+        if (delay > 0) delay_cycles((uint32_t)delay * 80);
+    }
+
+    return (uint16_t *)g_freq_buf;
+}

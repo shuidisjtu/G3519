@@ -20,6 +20,7 @@ const SPI           = scripting.addModule("/ti/driverlib/SPI", {}, false);
 const SPI1          = SPI.addInstance();
 const UART          = scripting.addModule("/ti/driverlib/UART", {}, false);
 const UART1         = UART.addInstance();
+const UART2         = UART.addInstance();
 const I2C           = scripting.addModule("/ti/driverlib/I2C", {}, false);
 const I2C1          = I2C.addInstance();
 const SYSCTL        = scripting.addModule("/ti/driverlib/SYSCTL");
@@ -146,6 +147,12 @@ UART1.uartClkSrc               = "MFCLK";
 UART1.peripheral.$assign       = "UART0";
 UART1.peripheral.rxPin.$assign = "PA11";
 UART1.peripheral.txPin.$assign = "PA10";
+
+UART2.$name                    = "UART_K230";
+UART2.uartClkSrc               = "BUSCLK";
+UART2.peripheral.$assign       = "UART6";
+UART2.peripheral.rxPin.$assign = "PC10";
+UART2.peripheral.txPin.$assign = "PC11";
 
 I2C1.$name                     = "I2C_AD5933";
 I2C1.basicEnableController     = true;

@@ -256,6 +256,7 @@
                 <option>
                     <name>CCDefines</name>
                     <state>__MSPM0G3519__</state>
+                    <state>ARM_MATH_CM0</state>
                 </option>
                 <option>
                     <name>CCPreprocFile</name>
@@ -383,6 +384,7 @@
                     <name>CCIncludePath2</name>
                     <state>$PROJ_DIR$</state>
                     <state>$MSPM0_SDK_INSTALL_DIR$/source/third_party/CMSIS/Core/Include</state>
+                    <state>$MSPM0_SDK_INSTALL_DIR$/source/third_party/CMSIS/DSP/Include</state>
                     <state>$MSPM0_SDK_INSTALL_DIR$/source</state>
                     <state>$PROJ_DIR$\..\NUEDC2025</state>
                     <state>$PROJ_DIR$\..\TSP3519</state>
@@ -829,6 +831,7 @@
                 <option>
                     <name>IlinkExtraOptions</name>
                     <state>$MSPM0_SDK_INSTALL_DIR$/source/ti/driverlib/lib/iar/m0p/mspm0gx51x/driverlib.a</state>
+                    <state>$MSPM0_SDK_INSTALL_DIR$/source/third_party/CMSIS/DSP/lib/iar/m0p/arm_cortexM0l_math.a</state>
                     <state>--silent</state>
                 </option>
                 <option>
@@ -1190,6 +1193,12 @@
         </file>
         <file>
             <name>$PROJ_DIR$\..\NUEDC2025\tsp_cmd.h</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_fft.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_fft.h</name>
         </file>
     </group>
     <group>
