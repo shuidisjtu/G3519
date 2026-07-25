@@ -50,7 +50,7 @@
 | **TFT LCD** | ST7735 160x128，SPI1（PB30/PB31/PB14），10MHz |
 | **按键** | S0(PA18)、S1(PC0)、S2(PA16)、PUSH(PA12) |
 | **编码器** | PHA0(PA14, 双边沿中断)、PHB0(PA15) |
-| **CCD** | 128 像素线阵 CCD 双通道，SI/CLK GPIO + ADC1 序列采样 |
+| **CCD** | 128 像素线阵 CCD 4 通道 2 组，SI/CLK GPIO + ADC1 序列采样（SysConfig） |
 | **电机驱动** | DRV8874x2（拓展板），TIMA0 PWM 20kHz，需 VBAT(SW1) |
 | **MPU6050** | 六轴 IMU（I2C0: PB21-SCL/PB22-SDA, 中断 PC8），驱动待开发 |
 | **UART** | UART0 调试：PA10/PA11；UART6->K230：PC10/PC11，J11 |
