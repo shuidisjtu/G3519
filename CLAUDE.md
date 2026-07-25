@@ -44,6 +44,7 @@ empty_mspm0g3519/
 │   ├── tsp_uart.h/.c                  ← UART0（MFCLK 4MHz, 115200-8N1, 环形缓冲 RX）
 │   ├── tsp_ad5933.h/.c                ← AD5933 阻抗测量（I2C1, 100kHz, 温度+扫频）
 │   └── tsp_dds.h/.c                   ← AD9833 DDS 波形发生器（GPIO bit-bang, 方波/正弦/三角波）
+│   └── tsp_adc.h/.c                   ← 通用 ADC（J2 五路, ADC0+ADC1, 电压/频率测量）
 └── docs/                              ← 硬件文档与项目进度
     ├── development_reference/         ← 开发参考文档
     └── project_schedule/              ← 项目进度跟踪
@@ -166,14 +167,14 @@ tsp_dds_stop();                               // 停止 DDS 输出 (RESET)
 // 无需 init: 首次 tsp_dds_set_output() 即完成初始化
 // DDS Test 交互: S0/S1 切换波形, 编码器调频率, PUSH 退出
 
-// ===== 通用 ADC（J2 三路，tsp_adc.c/.h）=====
-tsp_adc_init();                              // 配置 PA24/PB24 为模拟输入（PA25 由 SysConfig 配置）
+// ===== 通用 ADC（J2 五路，tsp_adc.c/.h）=====
+tsp_adc_init();                              // 配置 PA24/PB24/PA23 为模拟输入（PA25/PB23 由 SysConfig 配置）
 tsp_adc_select_channel(ADC_CH_VIN1);         // 切换通道: ADC_CH_VIN1(CH2), ADC_CH_VIN2(CH11), ADC_CH_VIN3(CH3), ADC_CH_VIN4(CH5), ADC_CH_VIN5(CH12)
 uint16_t raw = tsp_adc_read_raw();           // 单次 12-bit 采样（轮询模式）
 uint16_t mv  = tsp_adc_read_mv();            // 返回 mV（0~3300）
 uint16_t avg = tsp_adc_read_avg_mv(8);       // 8 次平均，返回 mV
 uint32_t hz  = tsp_adc_measure_freq();       // burst 采样 + 过零检测，返回 Hz（0=DC）
-// ADC Test 交互: S0/S1 切换通道, PUSH 退出
+// ADC Test 交互: S0/S1 切换通道（五通道循环）, PUSH 退出
 ```
 
 ## IAR 关键路径
