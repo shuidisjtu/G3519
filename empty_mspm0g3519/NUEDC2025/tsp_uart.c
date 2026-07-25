@@ -86,19 +86,23 @@ void tsp_uart_send_string(const char *str)
 uint8_t tsp_uart_read_byte(void)
 {
     uint8_t data = 0;
-    if (g_uart_rx_in != g_uart_rx_out) {
-        data = g_uart_rx_buf[g_uart_rx_out];
-        g_uart_rx_out = (g_uart_rx_out + 1) % UART_RX_BUF_SIZE;
+    uint16_t in  = g_uart_rx_in;
+    uint16_t out = g_uart_rx_out;
+    if (in != out) {
+        data = g_uart_rx_buf[out];
+        g_uart_rx_out = (out + 1) % UART_RX_BUF_SIZE;
     }
     return data;
 }
 
 uint16_t tsp_uart_available(void)
 {
-    if (g_uart_rx_in >= g_uart_rx_out) {
-        return (uint16_t)(g_uart_rx_in - g_uart_rx_out);
+    uint16_t in  = g_uart_rx_in;
+    uint16_t out = g_uart_rx_out;
+    if (in >= out) {
+        return (uint16_t)(in - out);
     } else {
-        return (uint16_t)(UART_RX_BUF_SIZE - g_uart_rx_out + g_uart_rx_in);
+        return (uint16_t)(UART_RX_BUF_SIZE - out + in);
     }
 }
 

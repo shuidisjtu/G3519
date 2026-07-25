@@ -1,4 +1,5 @@
 #include "ti_msp_dl_config.h"
+#include <math.h>
 #include "tsp_isr.h"
 #include "tsp_gpio.h"
 #include "TSP_TFT18.h"
@@ -10,6 +11,9 @@
 #include "tsp_motor.h"
 #include "tsp_ccd.h"
 #include "tsp_mpu6050.h"
+#include "tsp_pid.h"
+#include "tsp_odometer.h"
+#include "tsp_linefollow.h"
 
 /* ===== Global state ===== */
 extern volatile uint32_t sys_tick_counter;
@@ -48,7 +52,7 @@ static void boot_animation(void)
 	tsp_tft18_clear(BLACK);
 }
 
-/* ===== K230 Vision Test (color tracking with LCD overlay) ===== */
+/* ===== K230 Vision Test (multi-function: color/QR/AprilTag/face tracking) ===== */
 
 static void action_k230_test(void)
 {
@@ -56,7 +60,7 @@ static void action_k230_test(void)
 	int16_t lcd_x, lcd_y, lcd_w, lcd_h;
 	int16_t old_x = 0, old_y = 0, old_w = 0, old_h = 0;
 	int16_t last_disp_x = -1, last_disp_y = -1;
-	uint16_t last_fc = 0xFFFF, last_ec = 0xFFFF;
+	uint32_t last_fc = 0xFFFFFFFF, last_ec = 0xFFFFFFFF;
 	uint8_t has_old = 0, showed_x = 0, toggle_cnt = 0;
 
 	/* Full-screen tracking view */
@@ -79,18 +83,25 @@ static void action_k230_test(void)
 			for (i = 0; i < 5; i++) {
 				tsp_key_scan();
 				if (tsp_key_pressed(KEY_PUSH)) goto exit_k230;
+				/* S0: Send toggle command to K230 over UART6 TX */
 				if (tsp_key_pressed(KEY_S0)) {
-					/* Send toggle command to K230 over UART6 TX */
 					tsp_uart_k230_send_string("$SWITCH#\n");
 					toggle_cnt++;
-					/* Show toggle count on row 5 */
+					tsp_tft18_show_str_color(90, 0,
+					    (uint8_t *)"SW", GREEN, BLACK);
+					/* Show toggle count on title bar */
 					{
 						char tb[4];
 						tb[0] = 'T'; tb[1] = ':';
 						tb[2] = '0' + (toggle_cnt % 10);
 						tb[3] = '\0';
-						tsp_tft18_show_str_color(90, 0, (uint8_t *)tb, WHITE, BLACK);
+						tsp_tft18_show_str_color(128, 0, (uint8_t *)tb, WHITE, BLACK);
 					}
+				}
+				/* S1: Show current detected function ID on title bar */
+				if (tsp_key_pressed(KEY_S1)) {
+					tsp_tft18_show_str_color(90, 0,
+					    (uint8_t *)"FN", YELLOW, BLACK);
 				}
 				delay_1ms(1);
 			}
@@ -107,16 +118,19 @@ static void action_k230_test(void)
 			lcd_h = tgt.h / 6;
 
 			/* Clamp to canvas (title y=0..15, bottom divider y=104, x <= 159) */
+			if (lcd_w < 2) lcd_w = 2;
+			if (lcd_h < 2) lcd_h = 2;
 			if (lcd_x < 0) lcd_x = 0;
-			if (lcd_x + lcd_w > 159) lcd_w = 159 - lcd_x;
+			if (lcd_x + lcd_w > 159) lcd_x = 159 - lcd_w;
+			if (lcd_x < 0) lcd_x = 0;
 
 			/* Protect title row: push top edge below row 0 (16 px) */
 			if (lcd_y < 16) {
 				lcd_h -= (16 - lcd_y);
 				lcd_y = 16;
 			}
-			if (lcd_y + lcd_h > 95) lcd_h = 95 - lcd_y;
-			if (lcd_w < 2) lcd_w = 2;
+			if (lcd_y + lcd_h > 95) lcd_y = 95 - lcd_h;
+			if (lcd_y < 16) lcd_y = 16;
 			if (lcd_h < 2) lcd_h = 2;
 
 			/* Redraw rect only when position/size changes (prevents flicker) */
@@ -148,7 +162,11 @@ static void action_k230_test(void)
 				}
 				/* uint16 (5 digits, 40 px) -- fits within allocated space */
 				tsp_tft18_show_str_color(0, 6, (uint8_t *)"X:", WHITE, BLACK);
-				tsp_tft18_show_uint16(16, 6, (uint16_t)(tgt.x / 4));
+				{
+					int16_t disp_x = tgt.x / 4;
+					if (disp_x < 0) disp_x = 0;
+					tsp_tft18_show_uint16(16, 6, (uint16_t)disp_x);
+				}
 				tsp_tft18_show_str_color(56, 6, (uint8_t *)" Y:", WHITE, BLACK);
 				tsp_tft18_show_uint16(80, 6, (uint16_t)tgt.y);
 				last_disp_x = tgt.x;
@@ -158,24 +176,26 @@ static void action_k230_test(void)
 
 		/* Refresh F/E counters (row 7) only when values change */
 		{
-			uint16_t fc = (uint16_t)tsp_k230_frame_count();
-			uint16_t ec = (uint16_t)tsp_k230_error_count();
+			uint32_t fc = tsp_k230_frame_count();
+			uint32_t ec = tsp_k230_error_count();
 
 			if (fc != last_fc || ec != last_ec) {
 				char buf[21];
 				uint8_t p = 0;
+				uint16_t fc4 = (uint16_t)(fc % 10000);
+				uint16_t ec4 = (uint16_t)(ec % 10000);
 
 				buf[p++] = 'F'; buf[p++] = ':';
-				buf[p++] = '0' + (fc / 1000) % 10;
-				buf[p++] = '0' + (fc / 100) % 10;
-				buf[p++] = '0' + (fc / 10) % 10;
-				buf[p++] = '0' + (fc % 10);
+				buf[p++] = '0' + (fc4 / 1000) % 10;
+				buf[p++] = '0' + (fc4 / 100) % 10;
+				buf[p++] = '0' + (fc4 / 10) % 10;
+				buf[p++] = '0' + (fc4 % 10);
 				buf[p++] = ' ';
 				buf[p++] = 'E'; buf[p++] = ':';
-				buf[p++] = '0' + (ec / 1000) % 10;
-				buf[p++] = '0' + (ec / 100) % 10;
-				buf[p++] = '0' + (ec / 10) % 10;
-				buf[p++] = '0' + (ec % 10);
+				buf[p++] = '0' + (ec4 / 1000) % 10;
+				buf[p++] = '0' + (ec4 / 100) % 10;
+				buf[p++] = '0' + (ec4 / 10) % 10;
+				buf[p++] = '0' + (ec4 % 10);
 				while (p < 20) buf[p++] = ' ';
 				buf[20] = '\0';
 
@@ -189,115 +209,6 @@ static void action_k230_test(void)
 
 exit_k230:
 	tsp_uart_k230_rx_disable();
-	tsp_menu_request_redraw();
-}
-
-/* ===== Motor Test (AD2-friendly interactive PWM control) ===== */
-
-static void action_motor_test(void)
-{
-	uint8_t  motor      = MOTOR1;
-	uint8_t  dir[2]     = {MOTOR_FORWARD, MOTOR_FORWARD};
-	uint16_t duty[2]    = {0, 0};
-	uint8_t  redraw     = 1;
-	uint8_t  tick       = 0;
-
-	tsp_tft18_clear(BLACK);
-	tsp_tft18_show_str_color(0, 0, (uint8_t *)"Motor Test TIMA0", YELLOW, BLUE);
-	tsp_tft18_draw_line_h(0, 16, 160, BLUE);
-	tsp_tft18_show_str_color(0, 4, (uint8_t *)"PWM: 20kHz (50us)  ", WHITE, BLACK);
-	tsp_tft18_show_str_color(0, 6, (uint8_t *)"S0/S1:Duty S2:Dir", GRAY1, BLACK);
-	tsp_tft18_show_str_color(0, 7, (uint8_t *)"M1/M2:Enc PUSH:exit", GRAY1, BLACK);
-
-	tsp_motor_init();
-	SLEEP_HIGH();
-	tsp_encoder_enable();
-
-	while (1) {
-		tsp_key_scan();
-		if (tsp_key_pressed(KEY_PUSH)) goto exit_motor;
-
-		/* Encoder: switch motor -- left=M2, right=M1 */
-		{
-			int32_t enc = tsp_encoder_get_count();
-			if (enc != 0) {
-				uint8_t new_m = (enc < 0) ? MOTOR2 : MOTOR1;
-				if (new_m != motor) { motor = new_m; redraw = 1; }
-				tsp_encoder_reset();
-			}
-		}
-
-		/* S2: toggle direction for selected motor */
-		if (tsp_key_pressed(KEY_S2)) {
-			dir[motor] = (dir[motor] == MOTOR_FORWARD) ? MOTOR_BACKWARD : MOTOR_FORWARD;
-			tsp_motor_set(motor, dir[motor], duty[motor]);
-			redraw = 1;
-		}
-
-		/* S0: duty -5, S1: duty +5 for selected motor */
-		if (tsp_key_pressed(KEY_S0)) {
-			if (duty[motor] >= 5) duty[motor] -= 5; else duty[motor] = 0;
-			tsp_motor_set(motor, dir[motor], duty[motor]);
-			redraw = 1;
-		}
-		if (tsp_key_pressed(KEY_S1)) {
-			if (duty[motor] <= 95) duty[motor] += 5; else duty[motor] = 100;
-			tsp_motor_set(motor, dir[motor], duty[motor]);
-			redraw = 1;
-		}
-
-		/* Incremental LCD update */
-		if (redraw) {
-			char buf[21];
-			uint8_t p = 0, i;
-			char dname[4] = "FWD";
-
-			if (dir[motor] == MOTOR_BACKWARD) { dname[0]='R'; dname[1]='E'; dname[2]='V'; }
-
-			buf[p++] = 'M'; buf[p++] = (motor == MOTOR1) ? '1' : '2';
-			buf[p++] = ':'; buf[p++] = ' ';
-			buf[p++] = dname[0]; buf[p++] = dname[1]; buf[p++] = dname[2];
-			buf[p++] = ' ';
-			if (duty[motor] >= 100) { buf[p++] = '1'; buf[p++] = '0'; buf[p++] = '0'; }
-			else if (duty[motor] >= 10) { buf[p++] = '0' + (duty[motor]/10)%10; buf[p++] = '0' + duty[motor]%10; }
-			else { buf[p++] = ' '; buf[p++] = '0' + duty[motor]%10; }
-			buf[p++] = '%';
-			while (p < 20) buf[p++] = ' ';
-			buf[20] = '\0';
-			tsp_tft18_show_str_color(0, 2, (uint8_t *)buf, CYAN, BLACK);
-
-			/* Duty bar (row 3) */
-			{
-				uint8_t bar_fill = (uint8_t)(duty[motor] / 10);
-				buf[0] = 'D'; buf[1] = 'u'; buf[2] = 't'; buf[3] = 'y';
-				buf[4] = ':'; buf[5] = '[';
-				for (i = 0; i < 10; i++) {
-					buf[6+i] = (i < bar_fill) ? '#' : ' ';
-				}
-				buf[16] = ']'; buf[17] = '\0';
-				tsp_tft18_show_str_color(0, 3, (uint8_t *)buf, WHITE, BLACK);
-			}
-
-			redraw = 0;
-		}
-
-		/* nFAULT: poll every ~200ms, always refresh */
-		tick++;
-		if (tick >= 20) {
-			tick = 0;
-			if (tsp_motor_fault())
-				tsp_tft18_show_str_color(0, 5, (uint8_t *)"nFAULT: FAULT!      ", RED, BLACK);
-			else
-				tsp_tft18_show_str_color(0, 5, (uint8_t *)"nFAULT: OK          ", GREEN, BLACK);
-		}
-
-		delay_1ms(10);
-	}
-
-exit_motor:
-	tsp_encoder_disable();
-	tsp_motor_stop_all();
-	SLEEP_LOW();
 	tsp_menu_request_redraw();
 }
 
@@ -315,12 +226,12 @@ static void action_ccd_test(void)
 	uint8_t    ccd_ch    = CCD1;
 	uint8_t    exp_ms    = 10;
 	uint8_t    redraw    = 1;
-	uint16_t   max_v, min_v;
-	uint32_t   sum_v;
+	uint16_t   max_v = 0, min_v = 0;
+	uint32_t   sum_v = 0;
 	uint8_t    i;
 	uint8_t    tick      = 0;
 	uint8_t    cont_mode = 1;   /* 1=continuous capture, 0=single-shot */
-	uint8_t    captured;        /* set when new data is read this loop */
+	uint8_t    captured  = 0;
 
 	tsp_ccd_init();
 	tsp_ccd_set_exposure(exp_ms);
@@ -602,7 +513,9 @@ static void action_mpu6050_test(void)
 				} else {
 					/* Yaw page */
 					float yaw = tsp_mpu6050_get_yaw();
-					int16_t yaw_i = (int16_t)yaw;
+					float yaw_mod = fmodf(yaw, 360.0f);
+					if (yaw_mod < 0.0f) yaw_mod += 360.0f;
+					int16_t yaw_i = (int16_t)yaw_mod;
 
 					tsp_tft18_show_str_color(0, 1, (uint8_t *)"[Yaw Heading]   ", WHITE, BLACK);
 
@@ -634,13 +547,398 @@ exit_mpu:
 	tsp_menu_request_redraw();
 }
 
+/* ===== Motor Open-Loop Test (encoder-based duty adjust, distributed keys) ===== */
+
+static void action_motor_openloop(void)
+{
+	uint8_t  motor      = MOTOR1;
+	uint8_t  dir[2]     = {MOTOR_FORWARD, MOTOR_FORWARD};
+	uint16_t duty[2]    = {0, 0};
+	uint8_t  redraw     = 1;
+	uint8_t  tick       = 0;
+
+	tsp_tft18_clear(BLACK);
+	tsp_tft18_show_str_color(0, 0, (uint8_t *)"Motor OpenLoop", YELLOW, BLUE);
+	tsp_tft18_draw_line_h(0, 16, 160, BLUE);
+	tsp_tft18_show_str_color(0, 4, (uint8_t *)"PWM: 20kHz (50us)  ", WHITE, BLACK);
+	tsp_tft18_show_str_color(0, 6, (uint8_t *)"S0:-5% S1:+5% Dir:S2", GRAY1, BLACK);
+	tsp_tft18_show_str_color(0, 7, (uint8_t *)"Enc:M1/M2 PUSH:exit", GRAY1, BLACK);
+
+	tsp_motor_init();
+	SLEEP_HIGH();
+	tsp_encoder_enable();
+
+	while (1) {
+		tsp_key_scan();
+		if (tsp_key_pressed(KEY_PUSH)) goto exit_openloop;
+
+		/* Encoder: switch motor -- left=CCW=M2, right=CW=M1 */
+		{
+			int32_t enc = tsp_encoder_get_count();
+			if (enc != 0) {
+				uint8_t new_m = (enc < 0) ? MOTOR2 : MOTOR1;
+				if (new_m != motor) { motor = new_m; redraw = 1; }
+				tsp_encoder_reset();
+			}
+		}
+
+		/* S2: toggle direction for selected motor */
+		if (tsp_key_pressed(KEY_S2)) {
+			dir[motor] = (dir[motor] == MOTOR_FORWARD) ? MOTOR_BACKWARD : MOTOR_FORWARD;
+			tsp_motor_set(motor, dir[motor], duty[motor]);
+			redraw = 1;
+		}
+
+		/* S0: duty -5 for selected motor */
+		if (tsp_key_pressed(KEY_S0)) {
+			if (duty[motor] >= 5) duty[motor] -= 5; else duty[motor] = 0;
+			tsp_motor_set(motor, dir[motor], duty[motor]);
+			redraw = 1;
+		}
+		/* S1: duty +5 for selected motor */
+		if (tsp_key_pressed(KEY_S1)) {
+			if (duty[motor] <= 95) duty[motor] += 5; else duty[motor] = 100;
+			tsp_motor_set(motor, dir[motor], duty[motor]);
+			redraw = 1;
+		}
+
+		/* Incremental LCD update */
+		if (redraw) {
+			char buf[21];
+			uint8_t p = 0, i;
+
+			buf[p++] = 'M'; buf[p++] = (motor == MOTOR1) ? '1' : '2';
+			buf[p++] = ':'; buf[p++] = ' ';
+			if (dir[motor] == MOTOR_FORWARD) {
+				buf[p++] = 'F'; buf[p++] = 'W'; buf[p++] = 'D';
+			} else {
+				buf[p++] = 'R'; buf[p++] = 'E'; buf[p++] = 'V';
+			}
+			buf[p++] = ' ';
+			if (duty[motor] >= 100) { buf[p++] = '1'; buf[p++] = '0'; buf[p++] = '0'; }
+			else if (duty[motor] >= 10) { buf[p++] = '0' + (duty[motor]/10)%10; buf[p++] = '0' + duty[motor]%10; }
+			else { buf[p++] = ' '; buf[p++] = '0' + duty[motor]%10; }
+			buf[p++] = '%';
+			while (p < 20) buf[p++] = ' ';
+			buf[20] = '\0';
+			tsp_tft18_show_str_color(0, 2, (uint8_t *)buf, CYAN, BLACK);
+
+			/* Duty bar (row 3) */
+			{
+				uint8_t bar_fill = (uint8_t)(duty[motor] / 10);
+				buf[0] = 'D'; buf[1] = 'u'; buf[2] = 't'; buf[3] = 'y';
+				buf[4] = ':'; buf[5] = '[';
+				for (i = 0; i < 10; i++) {
+					buf[6+i] = (i < bar_fill) ? '#' : ' ';
+				}
+				buf[16] = ']'; buf[17] = '\0';
+				tsp_tft18_show_str_color(0, 3, (uint8_t *)buf, WHITE, BLACK);
+			}
+			redraw = 0;
+		}
+
+		/* nFAULT: poll every ~200ms */
+		tick++;
+		if (tick >= 20) {
+			tick = 0;
+			if (tsp_motor_fault())
+				tsp_tft18_show_str_color(0, 5, (uint8_t *)"nFAULT: FAULT!      ", RED, BLACK);
+			else
+				tsp_tft18_show_str_color(0, 5, (uint8_t *)"nFAULT: OK          ", GREEN, BLACK);
+		}
+
+		delay_1ms(10);
+	}
+
+exit_openloop:
+	tsp_encoder_disable();
+	tsp_motor_stop_all();
+	SLEEP_LOW();
+	tsp_menu_request_redraw();
+}
+
+/* ===== Motor Closed-Loop PID Speed Control (incremental PID, D-on-PV) ===== */
+/* Ported from HSP Ex6_pwm.c hsp_demo_motor_closeloop() */
+
+static void action_motor_closeloop(void)
+{
+	uint8_t  motor_run   = 0;     /* 0=stopped, 1=running, S2 to toggle */
+	uint16_t target_speed = 200;  /* target encoder pulses/20ms */
+	int16_t  current_speed;
+	int16_t  dc          = 0;     /* PWM duty cycle output (signed for bidirectional) */
+	uint16_t tick        = 0;
+	char     buf[32];
+
+	/* PID controller (incremental, D-on-PV) */
+	pid_inc_t spd_pid;
+	tsp_pid_inc_init(&spd_pid, 0.2f, 0.02f, 0.06f, 0.0f, 99.0f);
+
+	/* Init subsystems */
+	tsp_motor_init();
+	SLEEP_HIGH();
+	tsp_encoder_enable();
+
+	/* Draw UI */
+	tsp_tft18_clear(BLACK);
+	tsp_tft18_show_str_color(0, 0, (uint8_t *)"Motor ClsLoop PID", YELLOW, BLUE);
+	tsp_tft18_draw_line_h(0, 16, 160, BLUE);
+
+	tsp_tft18_show_str_color(0, 2, (uint8_t *)"TgtSpd:", CYAN, BLACK);
+	tsp_tft18_show_str_color(0, 3, (uint8_t *)"FdbkSpd:", CYAN, BLACK);
+	tsp_tft18_show_str_color(0, 4, (uint8_t *)"Duty:", CYAN, BLACK);
+	tsp_tft18_show_str_color(0, 5, (uint8_t *)"Status:", CYAN, BLACK);
+
+	tsp_tft18_show_str_color(0, 7, (uint8_t *)"S0/S1:Spd S2:Run/Stp", BLACK, GREEN);
+
+	/* Initial display */
+	tsp_tft18_show_uint16(72, 2, target_speed);
+	tsp_tft18_show_int16(72, 3, 0);
+	tsp_tft18_show_uint16(72, 4, 0);
+	tsp_tft18_show_str_color(72, 5, (uint8_t *)"STOP", BLACK, GREEN);
+
+	while (1) {
+		tsp_key_scan();
+		if (tsp_key_pressed(KEY_PUSH)) goto exit_closedloop;
+
+		/* S2: Toggle run/stop */
+		if (tsp_key_pressed(KEY_S2)) {
+			motor_run = !motor_run;
+			if (!motor_run) {
+				dc = 0;
+				tsp_pid_inc_reset(&spd_pid);
+				tsp_motor_stop_all();
+				tsp_tft18_show_str_color(72, 5, (uint8_t *)"STOP", BLACK, GREEN);
+				tsp_tft18_show_uint16(72, 4, 0);
+			} else {
+				tsp_tft18_show_str_color(72, 5, (uint8_t *)"RUN ", BLACK, YELLOW);
+			}
+		}
+
+		/* S0: target speed -10 */
+		if (tsp_key_pressed(KEY_S0)) {
+			if (target_speed >= 10) target_speed -= 10;
+			else target_speed = 0;
+			tsp_tft18_show_uint16(72, 2, target_speed);
+		}
+		/* S1: target speed +10 */
+		if (tsp_key_pressed(KEY_S1)) {
+			if (target_speed <= 490) target_speed += 10;
+			else target_speed = 500;
+			tsp_tft18_show_uint16(72, 2, target_speed);
+		}
+
+		/* Encoder: fine speed adjust ±1 (distributed from S0/S1) */
+		{
+			int32_t enc = tsp_encoder_get_count();
+			if (enc > 0) {
+				if (target_speed < 500) target_speed++;
+				tsp_tft18_show_uint16(72, 2, target_speed);
+				tsp_encoder_reset();
+			} else if (enc < 0) {
+				if (target_speed > 0) target_speed--;
+				tsp_tft18_show_uint16(72, 2, target_speed);
+				tsp_encoder_reset();
+			}
+		}
+
+		/* PID control: apply PWM every loop */
+		if (motor_run) {
+			current_speed = tsp_encoder_get_speed();
+			dc = (int16_t)tsp_pid_inc_step(&spd_pid,
+			                                (float)target_speed,
+			                                (float)current_speed,
+			                                1.0f);
+
+			/* Dead-zone: force output to 0 when target is 0 */
+			if (target_speed == 0) {
+				dc = 0;
+				tsp_pid_inc_reset(&spd_pid);
+			}
+			/* Sub-deadzone clamp at low speed */
+			if (dc < 38 && target_speed <= 30) {
+				dc = 0;
+			}
+
+			/* Apply to motors */
+			if (dc > 0) {
+				tsp_motor_set(MOTOR1, MOTOR_FORWARD, (uint16_t)dc);
+				tsp_motor_set(MOTOR2, MOTOR_FORWARD, (uint16_t)dc);
+			} else if (dc < 0) {
+				tsp_motor_set(MOTOR1, MOTOR_BACKWARD, (uint16_t)(-dc));
+				tsp_motor_set(MOTOR2, MOTOR_BACKWARD, (uint16_t)(-dc));
+			} else {
+				tsp_motor_stop_all();
+			}
+		}
+
+		/* Periodic display update (~100ms) */
+		tick++;
+		if (tick >= 10) {
+			tick = 0;
+			current_speed = tsp_encoder_get_speed();
+			tsp_tft18_show_int16(72, 3, current_speed);
+			if (motor_run) tsp_tft18_show_uint16(72, 4, (uint16_t)(dc >= 0 ? dc : -dc));
+			/* Kp/Ki/Kd display — use snprintf to prevent overflow */
+			snprintf(buf, sizeof(buf), "P%.1f I%.2f D%.2f", spd_pid.kp, spd_pid.ki, spd_pid.kd);
+			buf[20] = '\0';
+			tsp_tft18_show_str_color(0, 6, (uint8_t *)buf, GRAY1, BLACK);
+		}
+
+		delay_1ms(10);
+	}
+
+exit_closedloop:
+	tsp_motor_stop_all();
+	SLEEP_LOW();
+	tsp_encoder_disable();
+	tsp_menu_request_redraw();
+}
+
+/* ===== Odometer (里程计) — encoder-based distance/angle measurement ===== */
+/* Ported from HSP Odometer.c */
+
+static void action_odometer(void)
+{
+	tsp_encoder_enable();
+	tsp_odometer_demo();
+	tsp_encoder_disable();
+	tsp_menu_request_redraw();
+}
+
+/* ===== Line Following (巡线) — CCD-based PD steering + speed control ===== */
+/* Ported from HSP Project1_LineFollower.c */
+
+static void action_linefollow(void)
+{
+	tsp_linefollow_demo();
+	tsp_menu_request_redraw();
+}
+
+/* ===== Speed/PID Parameter Setting (encoder-based parameter tuning) ===== */
+/* Ported from HSP project_para_set() / hsp_speed_setting() */
+
+static void action_speed_setting(void)
+{
+	uint8_t  item       = 1;       /* 1=Kp_steer, 2=Kd_steer, 3=Kp_spd, 4=Kd_spd, 5=BaseSpd */
+	uint8_t  redraw     = 1;
+	float    kp_s, kd_s, kp_v, kd_v;
+	uint8_t  base_spd;
+	char     buf[21];
+	int32_t  enc;
+
+	/* Read current values */
+	tsp_linefollow_get_steer_gains(&kp_s, &kd_s);
+	tsp_linefollow_get_speed_gains(&kp_v, &kd_v);
+	base_spd = tsp_linefollow_get_speed_val();
+
+	tsp_tft18_clear(BLACK);
+	tsp_tft18_show_str_color(0, 0, (uint8_t *)"PID Parameter Set", RED, YELLOW);
+	tsp_tft18_draw_line_h(0, 16, 160, BLUE);
+
+	tsp_tft18_show_str_color(0, 7, (uint8_t *)"S0/S1:item Enc:val  ", BLACK, GREEN);
+
+	tsp_encoder_enable();
+
+	while (1) {
+		tsp_key_scan();
+		if (tsp_key_pressed(KEY_PUSH)) goto exit_param;
+
+		/* S0: Previous item */
+		if (tsp_key_pressed(KEY_S0)) {
+			if (item > 1) item--;
+			redraw = 1;
+		}
+		/* S1: Next item */
+		if (tsp_key_pressed(KEY_S1)) {
+			if (item < 5) item++;
+			redraw = 1;
+		}
+
+		/* Encoder: Adjust selected parameter (fine control) */
+		enc = tsp_encoder_get_count();
+		if (enc != 0) {
+			float step  = 0.1f;
+			float *pval = &kp_s;
+			float vmin  = 0.0f;
+			float vmax  = 15.0f;
+
+			switch (item) {
+			case 1:  pval = &kp_s;  step = 0.1f;  vmin = 0.0f;  vmax = 9.0f;   break;
+			case 2:  pval = &kd_s;  step = 0.5f;  vmin = 0.0f;  vmax = 15.0f;  break;
+			case 3:  pval = &kp_v;  step = 0.1f;  vmin = 0.0f;  vmax = 5.0f;   break;
+			case 4:  pval = &kd_v;  step = 0.01f; vmin = 0.0f;  vmax = 2.0f;   break;
+			case 5:
+				if (enc > 0)      { if (base_spd < 100) base_spd += 5; }
+				else if (enc < 0) { if (base_spd >= 5)  base_spd -= 5; }
+				redraw = 1;
+				tsp_encoder_reset();
+				continue;
+			}
+
+			if (enc > 0)       { *pval += step; if (*pval > vmax) *pval = vmax; }
+			else if (enc < 0)  { *pval -= step; if (*pval < vmin) *pval = vmin; }
+			redraw = 1;
+			tsp_encoder_reset();
+		}
+
+		/* Update LCD (incremental) */
+		if (redraw) {
+			/* Clear all cursor markers */
+			tsp_tft18_show_str_color(0, 2, (uint8_t *)"  ", WHITE, BLACK);
+			tsp_tft18_show_str_color(0, 3, (uint8_t *)"  ", WHITE, BLACK);
+			tsp_tft18_show_str_color(0, 4, (uint8_t *)"  ", WHITE, BLACK);
+			tsp_tft18_show_str_color(0, 5, (uint8_t *)"  ", WHITE, BLACK);
+			tsp_tft18_show_str_color(0, 6, (uint8_t *)"  ", WHITE, BLACK);
+
+			/* Show cursor (->) for selected item */
+			tsp_tft18_show_str_color(0, item + 1, (uint8_t *)"->", WHITE, BLACK);
+
+			/* Row 2: Kp_steer */
+			snprintf(buf, sizeof(buf), "KpStr: %0.1f", kp_s);
+			tsp_tft18_show_str_color(16, 2, (uint8_t *)buf, CYAN, BLACK);
+
+			/* Row 3: Kd_steer */
+			snprintf(buf, sizeof(buf), "KdStr: %0.1f", kd_s);
+			tsp_tft18_show_str_color(16, 3, (uint8_t *)buf, CYAN, BLACK);
+
+			/* Row 4: Kp_spd */
+			snprintf(buf, sizeof(buf), "KpSpd: %0.2f", kp_v);
+			tsp_tft18_show_str_color(16, 4, (uint8_t *)buf, CYAN, BLACK);
+
+			/* Row 5: Kd_spd */
+			snprintf(buf, sizeof(buf), "KdSpd: %0.3f", kd_v);
+			tsp_tft18_show_str_color(16, 5, (uint8_t *)buf, CYAN, BLACK);
+
+			/* Row 6: BaseSpeed */
+			snprintf(buf, sizeof(buf), "Spd: %03d%%", base_spd);
+			tsp_tft18_show_str_color(16, 6, (uint8_t *)buf, CYAN, BLACK);
+
+			redraw = 0;
+		}
+
+		delay_1ms(10);
+	}
+
+exit_param:
+	/* Save parameters back */
+	tsp_linefollow_set_steer_gains(kp_s, kd_s);
+	tsp_linefollow_set_speed_gains(kp_v, kd_v);
+	tsp_linefollow_set_speed(base_spd);
+	tsp_encoder_disable();
+	tsp_menu_request_redraw();
+}
+
 /* ===== Main Menu ===== */
 
 static tsp_menu_item_t main_menu[] = {
-	{"K230 Test",      action_k230_test},
-	{"CCD Test",       action_ccd_test},
-	{"Motor Test",     action_motor_test},
-	{"MPU6050 Test",   action_mpu6050_test},
+	{"K230 Test",       action_k230_test},
+	{"CCD Test",        action_ccd_test},
+	{"Motor OpenLoop",  action_motor_openloop},
+	{"Motor ClsLoop",   action_motor_closeloop},
+	{"Odometer",        action_odometer},
+	{"Line Follow",     action_linefollow},
+	{"MPU6050 Test",    action_mpu6050_test},
+	{"Speed Setting",   action_speed_setting},
 };
 
 #define MAIN_MENU_COUNT  (sizeof(main_menu) / sizeof(main_menu[0]))

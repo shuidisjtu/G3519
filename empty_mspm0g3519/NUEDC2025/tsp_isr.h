@@ -1,5 +1,5 @@
-#ifndef _tsp_isr_h_
-#define _tsp_isr_h_
+#ifndef TSP_ISR_H_
+#define TSP_ISR_H_
 
 #include "tsp_common_headfile.h"
 

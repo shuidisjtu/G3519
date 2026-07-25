@@ -36,10 +36,10 @@ void GROUP1_IRQHandler(void)
 
     switch (group_iidx) {
     case DL_INTERRUPT_GROUP1_IIDX_GPIOA: {
-        /* Get highest priority pending GPIOA pin interrupt */
+        /* Get highest priority pending GPIOA pin interrupt.
+         * Reading IIDX auto-clears the pending bit — no explicit clear needed. */
         DL_GPIO_IIDX dio_iidx = DL_GPIO_getPendingInterrupt(GPIOA);
         tsp_encoder_isr((uint8_t)dio_iidx);
-        DL_GPIO_clearInterruptStatus(GPIOA, dio_iidx);
         break;
     }
     default:

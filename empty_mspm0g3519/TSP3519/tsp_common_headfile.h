@@ -1,9 +1,9 @@
-#ifndef _tsp_common_headfile_h_
-#define _tsp_common_headfile_h_
+#ifndef TSP_COMMON_HEADFILE_H_
+#define TSP_COMMON_HEADFILE_H_
 
-#include "stdio.h"
-#include "stdint.h"
-#include "string.h"
+#include <stdio.h>
+#include <stdint.h>
+#include <string.h>
 
 //===================================================芯片 SDK 底层===================================================
 #include "ti_msp_dl_config.h"

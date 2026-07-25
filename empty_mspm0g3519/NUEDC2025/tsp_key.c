@@ -61,9 +61,11 @@ void tsp_key_scan(void)
                 g_keys[i].debounce_cnt++;
             }
             if (g_keys[i].debounce_cnt == KEY_DEBOUNCE_CNT) {
-                /* Confirmed stable - update state */
-                g_keys[i].state_prev = g_keys[i].state;
-                g_keys[i].state = raw;
+                /* Confirmed stable - update state only on actual change */
+                if (g_keys[i].state != raw) {
+                    g_keys[i].state_prev = g_keys[i].state;
+                    g_keys[i].state = raw;
+                }
             }
         }
     }

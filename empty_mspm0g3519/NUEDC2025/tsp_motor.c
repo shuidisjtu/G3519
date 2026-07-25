@@ -137,7 +137,7 @@ void tsp_motor_set(uint8_t motor, uint8_t dir, uint16_t duty_pct)
         /* IN1=HIGH, IN2=100% -> low-side brake */
         DL_GPIO_setPins(PORTB_PORT, dir_pin);
         DL_TimerG_setCaptureCompareValue(MOTOR_PWM_INST,
-            MOTOR_PWM_PERIOD, cc_index);
+            MOTOR_PWM_PERIOD + 1U, cc_index);
         break;
 
     default:

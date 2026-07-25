@@ -31,6 +31,11 @@ void tsp_k230_init(void)
 /* All chars in str are decimal digits (str non-empty) */
 static uint8_t is_number(const char *str)
 {
+    uint8_t len = 0;
+    if (*str == '\0') {
+        return 0;
+    }
+    if (*str == '-') str++;
     if (*str == '\0') {
         return 0;
     }
@@ -38,6 +43,7 @@ static uint8_t is_number(const char *str)
         if (*str < '0' || *str > '9') {
             return 0;
         }
+        if (++len > 5) return 0;
         str++;
     }
     return 1;

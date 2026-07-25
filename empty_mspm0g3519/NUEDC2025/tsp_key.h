@@ -1,5 +1,5 @@
-#ifndef _TSP_KEY_H
-#define _TSP_KEY_H
+#ifndef TSP_KEY_H_
+#define TSP_KEY_H_
 
 #include "tsp_common_headfile.h"
 

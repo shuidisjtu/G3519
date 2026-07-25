@@ -1,5 +1,5 @@
-#ifndef _TSP_MPU6050_H
-#define _TSP_MPU6050_H
+#ifndef TSP_MPU6050_H_
+#define TSP_MPU6050_H_
 
 #include "tsp_common_headfile.h"
 

@@ -17,8 +17,8 @@
  * Reference: D:\EDC26_HSPv2\Utilities\HSP_MOTOR.h
  */
 
-#ifndef _TSP_MOTOR_H
-#define _TSP_MOTOR_H
+#ifndef TSP_MOTOR_H_
+#define TSP_MOTOR_H_
 
 #include "tsp_common_headfile.h"
 #include "tsp_gpio.h"

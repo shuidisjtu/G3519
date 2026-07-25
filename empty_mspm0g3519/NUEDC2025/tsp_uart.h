@@ -1,5 +1,5 @@
-#ifndef _TSP_UART_H
-#define _TSP_UART_H
+#ifndef TSP_UART_H_
+#define TSP_UART_H_
 
 #include "tsp_common_headfile.h"
 

@@ -8,6 +8,8 @@
 static volatile int32_t  g_enc_count;       /* accumulated pulse count */
 static volatile int16_t  g_enc_speed;       /* latest speed measurement */
 static          uint32_t g_enc_last_tick;   /* last speed update tick */
+static          int32_t  g_enc_last_count;  /* last count for speed calc */
+static          uint8_t  g_enc_first_run = 1;
 
 /* PHA0 pin IIDX — matches SysConfig generated value */
 #define ENC_PHA0_IIDX   (DL_GPIO_IIDX_DIO14)   /* PA14 */
@@ -60,18 +62,20 @@ void tsp_encoder_update_speed(void)
     uint32_t elapsed = now - g_enc_last_tick;
 
     if (elapsed >= ENC_SPEED_INTERVAL_MS) {
-        static int32_t last_count;
-        static uint8_t first_run = 1;
         int32_t current = g_enc_count;
 
-        if (first_run) {
-            /* Sync baseline on first call to avoid initial speed spike */
-            last_count = current;
-            first_run  = 0;
+        if (g_enc_first_run) {
+            g_enc_last_count = current;
+            g_enc_first_run  = 0;
         }
 
-        g_enc_speed      = (int16_t)(current - last_count);
-        last_count       = current;
+        {
+            int32_t delta = current - g_enc_last_count;
+            if (delta > INT16_MAX)  delta = INT16_MAX;
+            if (delta < INT16_MIN)  delta = INT16_MIN;
+            g_enc_speed = (int16_t)delta;
+        }
+        g_enc_last_count = current;
         g_enc_last_tick  = now;
     }
 }
@@ -97,9 +101,11 @@ void tsp_encoder_reset(void)
 {
     uint32_t primask = __get_PRIMASK();
     __disable_irq();
-    g_enc_count     = 0;
-    g_enc_speed     = 0;
-    g_enc_last_tick = sys_tick_counter;
+    g_enc_count      = 0;
+    g_enc_speed      = 0;
+    g_enc_last_tick  = sys_tick_counter;
+    g_enc_last_count = 0;
+    g_enc_first_run  = 1;
     __set_PRIMASK(primask);
 }
 

@@ -1,5 +1,5 @@
-#ifndef _TSP_K230_H
-#define _TSP_K230_H
+#ifndef TSP_K230_H_
+#define TSP_K230_H_
 
 #include "tsp_common_headfile.h"
 

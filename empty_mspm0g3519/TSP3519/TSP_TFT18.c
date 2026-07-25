@@ -124,7 +124,7 @@ void tsp_tft18_init(void)
 	LCD_CS_LOW();
 
 	tsp_tft18_write_cmd(0x11);		// Sleep out & booster on
-	delay_1ms(20);
+	delay_1ms(120);
 
 	tsp_tft18_write_cmd(0xB1);		// Frame Rate Control for normal mode
 	tsp_tft18_write_byte(0x05);
@@ -253,7 +253,8 @@ void tsp_tft18_show_char(uint16_t x, uint16_t y, uint8_t data)
 {
     uint8_t i,j;
     uint8_t temp;
-	
+    if (data < 32 || data > 126) data = '?';
+
     for(i=0; i<16; i++)
     {
         tsp_tft18_set_region(x, y+i, x+7, y+i);
@@ -264,7 +265,7 @@ void tsp_tft18_show_char(uint16_t x, uint16_t y, uint8_t data)
                 tsp_tft18_write_2byte(WHITE);
             else
                 tsp_tft18_write_2byte(BLACK);
-				temp>>=1;
+            temp>>=1;
         }
     }
 }
@@ -274,7 +275,8 @@ void tsp_tft18_show_char_color(uint16_t x, uint16_t y, uint8_t data, uint16_t fc
 {
     uint8_t i,j;
     uint8_t temp;
-	
+    if (data < 32 || data > 126) data = '?';
+
     for(i=0; i<16; i++)
     {
         tsp_tft18_set_region(x, y+i, x+7, y+i);
@@ -285,7 +287,7 @@ void tsp_tft18_show_char_color(uint16_t x, uint16_t y, uint8_t data, uint16_t fc
                 tsp_tft18_write_2byte(fcolor);
             else
                 tsp_tft18_write_2byte(bcolor);
-				temp>>=1;
+            temp>>=1;
         }
     }
 }
@@ -293,9 +295,9 @@ void tsp_tft18_show_char_color(uint16_t x, uint16_t y, uint8_t data, uint16_t fc
 // x: count by dot (0~159), y: count by line (16 dots per line)
 void tsp_tft18_show_str(uint16_t x, uint16_t y, uint8_t data[])
 {
-    uint8_t i=0;
-	
-    while(data[i] != '\0')
+    uint16_t i=0;
+
+    while(data[i] != '\0' && (x + 8 * i + 7) < TFT_X_MAX)
     {
 		tsp_tft18_show_char(x+8*i, y*16, data[i]);
 		i++;
@@ -305,9 +307,9 @@ void tsp_tft18_show_str(uint16_t x, uint16_t y, uint8_t data[])
 // x: count by dot (0~159), y: count by line (16 dots per line)
 void tsp_tft18_show_str_color(uint16_t x, uint16_t y, uint8_t data[], uint16_t fcolor, uint16_t bcolor)
 {
-    uint8_t i=0;
-	
-    while(data[i] != '\0')
+    uint16_t i=0;
+
+    while(data[i] != '\0' && (x + 8 * i + 7) < TFT_X_MAX)
     {
 		tsp_tft18_show_char_color(x+8*i, y*16, data[i], fcolor, bcolor);
 		i++;
@@ -319,17 +321,21 @@ void tsp_tft18_show_int8(uint16_t x, uint16_t y, int8_t data)
 {
     uint8_t a[3];
     uint8_t i;
+    uint8_t udata;
     if(data < 0)
     {
         tsp_tft18_show_char(x, y*16, '-');
-        data = -data;
+        udata = (uint8_t)(-(int16_t)data);
     }
     else
+    {
         tsp_tft18_show_char(x, y*16, ' ');
-	
-    a[0] = data/100;
-    a[1] = data/10%10;
-    a[2] = data%10;
+        udata = (uint8_t)data;
+    }
+
+    a[0] = udata/100;
+    a[1] = udata/10%10;
+    a[2] = udata%10;
     i = 0;
     while(i<3)
     {
@@ -343,17 +349,21 @@ void tsp_tft18_show_int8_color(uint16_t x, uint16_t y, int8_t data, uint16_t fco
 {
     uint8_t a[3];
     uint8_t i;
+    uint8_t udata;
     if(data < 0)
     {
         tsp_tft18_show_char_color(x, y*16, '-', fcolor, bcolor);
-        data = -data;
+        udata = (uint8_t)(-(int16_t)data);
     }
     else
+    {
         tsp_tft18_show_char_color(x, y*16, ' ', fcolor, bcolor);
-	
-    a[0] = data/100;
-    a[1] = data/10%10;
-    a[2] = data%10;
+        udata = (uint8_t)data;
+    }
+
+    a[0] = udata/100;
+    a[1] = udata/10%10;
+    a[2] = udata%10;
     i = 0;
     while(i<3)
     {
@@ -402,19 +412,23 @@ void tsp_tft18_show_int16(uint16_t x, uint16_t y, int16_t data)
 {
     uint8_t a[5];
     uint8_t i;
+    uint16_t udata;
     if(data < 0)
     {
         tsp_tft18_show_char(x, y*16, '-');
-        data = -data;
+        udata = (uint16_t)(-(int32_t)data);
     }
     else
+    {
         tsp_tft18_show_char(x, y*16, ' ');
-	
-    a[0] = data/10000;
-    a[1] = data/1000%10;
-    a[2] = data/100%10;
-    a[3] = data/10%10;
-    a[4] = data%10;
+        udata = (uint16_t)data;
+    }
+
+    a[0] = udata/10000;
+    a[1] = udata/1000%10;
+    a[2] = udata/100%10;
+    a[3] = udata/10%10;
+    a[4] = udata%10;
     i = 0;
     while(i<5)
     {
@@ -428,19 +442,23 @@ void tsp_tft18_show_int16_color(uint16_t x, uint16_t y, int16_t data, uint16_t f
 {
     uint8_t a[5];
     uint8_t i;
+    uint16_t udata;
     if(data < 0)
     {
         tsp_tft18_show_char_color(x, y*16, '-', fcolor, bcolor);
-        data = -data;
+        udata = (uint16_t)(-(int32_t)data);
     }
     else
+    {
         tsp_tft18_show_char_color(x, y*16, ' ', fcolor, bcolor);
+        udata = (uint16_t)data;
+    }
 	
-    a[0] = data/10000;
-    a[1] = data/1000%10;
-    a[2] = data/100%10;
-    a[3] = data/10%10;
-    a[4] = data%10;
+    a[0] = udata/10000;
+    a[1] = udata/1000%10;
+    a[2] = udata/100%10;
+    a[3] = udata/10%10;
+    a[4] = udata%10;
     i = 0;
     while(i<5)
     {
@@ -513,14 +531,14 @@ void tsp_tft18_draw_line_v(uint16_t x_start, uint16_t y_start, uint16_t length, 
 
 void tsp_tft18_draw_frame(uint8_t x_start, uint8_t y_start, uint8_t dx, uint8_t dy, uint16_t color)
 {
-    if(((x_start+dx)>TFT_X_MAX) || ((y_start+dy)>TFT_Y_MAX) || \
+    if(dx < 2 || dy < 2 || (x_start+dx)>TFT_X_MAX || (y_start+dy)>TFT_Y_MAX || \
         (x_start>(TFT_X_MAX-1)) || (y_start>(TFT_Y_MAX-1)))
 		return;
 
     tsp_tft18_draw_line_h(x_start, y_start, dx, color);
-	tsp_tft18_draw_line_h(x_start, y_start+dy, dx, color);
+	tsp_tft18_draw_line_h(x_start, y_start+dy-1, dx, color);
     tsp_tft18_draw_line_v(x_start, y_start, dy, color);
-	tsp_tft18_draw_line_v(x_start+dx, y_start, dy, color);
+	tsp_tft18_draw_line_v(x_start+dx-1, y_start, dy, color);
 }
 
 void tsp_tft18_draw_block(uint8_t x_start, uint8_t y_start, uint8_t dx, uint8_t dy, uint16_t color)
@@ -548,7 +566,7 @@ void tsp_tft18_draw_menu_cursor(uint16_t x, uint8_t line, uint16_t color)
     
     for(i=0; i<16; i++)
     {
-		tsp_tft18_set_region(x, line*16+i, x+16, line*16+i);
+		tsp_tft18_set_region(x, line*16+i, x+15, line*16+i);
         data = menu_cursor1[i*2];
         for(j=0; j<8; j++)
         {

@@ -1,5 +1,5 @@
-#ifndef _TSP_TFT18_H
-#define _TSP_TFT18_H
+#ifndef TSP_TFT18_H_
+#define TSP_TFT18_H_
 
 #include "tsp_gpio.h"
 
@@ -35,9 +35,9 @@
 #define GRAY1		0x8410
 #define GRAY2		0x4208
 
-#define COLOR565(r, g, b) (((r & 0xF8) << 8) | ((g & 0xFC) << 3) | ((b & 0xF8) >> 3))
-#define GRAY2RGB16(t) ((t >> 3)|((t & ~3) << 3)|((t & ~7) << 8))
-#define GRAY2RGB16_hl(t) ((t << 5) | ((t&~3)<<11) | (t & ~7))
+#define COLOR565(r, g, b) ((((r) & 0xF8) << 8) | (((g) & 0xFC) << 3) | (((b) & 0xF8) >> 3))
+#define GRAY2RGB16(t) (((t) >> 3)|(((t) & ~3) << 3)|(((t) & ~7) << 8))
+#define GRAY2RGB16_hl(t) ((((t) & 0xF8) >> 3) | (((t) & 0xFC) << 3) | (((t) & 0xF8) << 8))
 
 void tsp_tft18_init(void);
 void tsp_tft18_write_cmd(uint8_t dat);

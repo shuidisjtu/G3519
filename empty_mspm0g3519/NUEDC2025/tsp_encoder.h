@@ -1,5 +1,5 @@
-#ifndef _TSP_ENCODER_H
-#define _TSP_ENCODER_H
+#ifndef TSP_ENCODER_H_
+#define TSP_ENCODER_H_
 
 #include "tsp_common_headfile.h"
 

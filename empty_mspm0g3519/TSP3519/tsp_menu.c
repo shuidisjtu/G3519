@@ -22,6 +22,7 @@ static uint8_t           g_count;
 static uint8_t           g_cursor;
 static uint8_t           g_cursor_prev;
 static uint8_t           g_needs_full;     /* 1 = full redraw (init/switch/after-action) */
+static uint8_t           g_window_start;   /* first visible item index (for scrolling >6 items) */
 
 /* Draw a single menu row in selected or normal style.
  * Pads text to 20 characters (160px at 8px font) so the background
@@ -29,7 +30,7 @@ static uint8_t           g_needs_full;     /* 1 = full redraw (init/switch/after
  * previous selection when menu items have different text lengths. */
 static void menu_draw_row(uint8_t idx)
 {
-    uint8_t     row = MENU_ITEMS_START + idx;
+    uint8_t     row = MENU_ITEMS_START + (idx - g_window_start);
     const char *src = g_items[idx].text;
     uint8_t     buf[21];  /* 20 chars + null */
     uint8_t     j;
@@ -54,22 +55,19 @@ static void menu_draw_row(uint8_t idx)
 
 void tsp_menu_init(const char *title, tsp_menu_item_t *items, uint8_t count)
 {
+    if (count == 0) return;
     g_title        = title;
     g_items        = items;
     g_count        = count;
     g_cursor       = 0;
     g_cursor_prev  = 0;
     g_needs_full   = 1;
+    g_window_start = 0;
 }
 
 void tsp_menu_switch(const char *title, tsp_menu_item_t *items, uint8_t count)
 {
-    g_title        = title;
-    g_items        = items;
-    g_count        = count;
-    g_cursor       = 0;
-    g_cursor_prev  = 0;
-    g_needs_full   = 1;
+    tsp_menu_init(title, items, count);
 }
 
 /* Allow a leaf action to request a full menu redraw when it returns.
@@ -144,26 +142,51 @@ uint8_t tsp_menu_run(void)
                                  (uint8_t *)g_title, BLUE, YELLOW);
         tsp_tft18_draw_line_h(0, (MENU_TITLE_ROW + 1) * 16, 160, BLUE);
 
-        /* Draw new menu items */
-        for (i = 0; i < g_count && i < MENU_ITEMS_MAX; i++) {
-            menu_draw_row(i);
+        /* Ensure cursor is visible */
+        if (g_cursor < g_window_start) {
+            g_window_start = g_cursor;
+        } else if (g_cursor >= g_window_start + MENU_ITEMS_MAX) {
+            g_window_start = g_cursor - MENU_ITEMS_MAX + 1;
         }
 
-        /* Clear any remaining rows left over from previous menu
-         * (e.g. main menu has 6 items, sub-menu has only 2) */
-        for (; i < MENU_ITEMS_MAX; i++) {
-            tsp_tft18_show_str_color(0, MENU_ITEMS_START + i,
-                                     (uint8_t *)MENU_BLANK_STR,
-                                     MENU_FG_COLOR, MENU_BG_COLOR);
+        /* Draw visible menu items within window */
+        {
+            uint8_t end = g_window_start + MENU_ITEMS_MAX;
+            if (end > g_count) end = g_count;
+            for (i = g_window_start; i < end; i++) {
+                menu_draw_row(i);
+            }
+            /* Clear any remaining rows */
+            for (; i < g_window_start + MENU_ITEMS_MAX; i++) {
+                tsp_tft18_show_str_color(0, MENU_ITEMS_START + (i - g_window_start),
+                                         (uint8_t *)MENU_BLANK_STR,
+                                         MENU_FG_COLOR, MENU_BG_COLOR);
+            }
         }
 
         return back;
     }
 
-    /* Incremental update: only redraw rows whose selection state changed */
+    /* Scroll window if cursor moved beyond visible range */
     if (g_cursor != g_cursor_prev) {
-        menu_draw_row(g_cursor_prev);  /* old cursor -> unselected */
-        menu_draw_row(g_cursor);       /* new cursor -> selected   */
+        uint8_t old_win = g_window_start;
+
+        if (g_cursor < g_window_start) {
+            g_window_start = g_cursor;
+        } else if (g_cursor >= g_window_start + MENU_ITEMS_MAX) {
+            g_window_start = g_cursor - MENU_ITEMS_MAX + 1;
+        }
+
+        if (g_window_start != old_win) {
+            /* Window shifted — full redraw needed; skip incremental draw
+             * to avoid one-frame cursor flash at wrong position */
+            g_needs_full = 1;
+            return back;
+        } else {
+            /* Incremental update: only redraw rows whose selection state changed */
+            menu_draw_row(g_cursor_prev);  /* old cursor -> unselected */
+            menu_draw_row(g_cursor);       /* new cursor -> selected   */
+        }
     }
 
     return back;

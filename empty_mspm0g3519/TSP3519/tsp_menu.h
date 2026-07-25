@@ -1,5 +1,5 @@
-#ifndef _TSP_MENU_H
-#define _TSP_MENU_H
+#ifndef TSP_MENU_H_
+#define TSP_MENU_H_
 
 #include "tsp_common_headfile.h"
 #include "TSP_TFT18.h"

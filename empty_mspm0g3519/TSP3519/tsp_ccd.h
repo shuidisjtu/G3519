@@ -1,5 +1,5 @@
-#ifndef _TSP_CCD_H
-#define _TSP_CCD_H
+#ifndef TSP_CCD_H_
+#define TSP_CCD_H_
 
 #include "tsp_common_headfile.h"
 

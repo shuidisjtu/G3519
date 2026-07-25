@@ -71,19 +71,23 @@ void tsp_uart_k230_send_string(const char *str)
 uint8_t tsp_uart_k230_read_byte(void)
 {
     uint8_t data = 0;
-    if (g_k230_rx_in != g_k230_rx_out) {
-        data = g_k230_rx_buf[g_k230_rx_out];
-        g_k230_rx_out = (g_k230_rx_out + 1) % K230_UART_RX_BUF_SIZE;
+    uint16_t in  = g_k230_rx_in;
+    uint16_t out = g_k230_rx_out;
+    if (in != out) {
+        data = g_k230_rx_buf[out];
+        g_k230_rx_out = (out + 1) % K230_UART_RX_BUF_SIZE;
     }
     return data;
 }
 
 uint16_t tsp_uart_k230_available(void)
 {
-    if (g_k230_rx_in >= g_k230_rx_out) {
-        return (uint16_t)(g_k230_rx_in - g_k230_rx_out);
+    uint16_t in  = g_k230_rx_in;
+    uint16_t out = g_k230_rx_out;
+    if (in >= out) {
+        return (uint16_t)(in - out);
     } else {
-        return (uint16_t)(K230_UART_RX_BUF_SIZE - g_k230_rx_out + g_k230_rx_in);
+        return (uint16_t)(K230_UART_RX_BUF_SIZE - out + in);
     }
 }
 

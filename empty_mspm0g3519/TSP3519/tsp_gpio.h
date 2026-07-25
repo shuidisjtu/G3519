@@ -1,5 +1,5 @@
-#ifndef _TSP_GPIO_H
-#define _TSP_GPIO_H
+#ifndef TSP_GPIO_H_
+#define TSP_GPIO_H_
 
 #include "ti_msp_dl_config.h"
 

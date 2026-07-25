@@ -97,7 +97,7 @@ void tsp_ccd_set_exposure(uint8_t ms)
 
 void tsp_ccd_flush(uint8_t ccd_id)
 {
-    uint8_t i;
+    uint16_t i;
 
     /* ─── Start integration cycle ─── */
     ccd_si_high(ccd_id);
@@ -124,7 +124,7 @@ void tsp_ccd_flush(uint8_t ccd_id)
 
 void tsp_ccd_snapshot(uint8_t ccd_id, ccd_data_t pixels)
 {
-    uint8_t          i;
+    uint16_t         i;
     DL_ADC12_MEM_IDX mem_idx = ccd_adc_mem_idx(ccd_id);
 
     /* 1. Flush previously integrated frame */
