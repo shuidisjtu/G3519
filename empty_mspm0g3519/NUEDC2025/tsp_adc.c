@@ -2,18 +2,31 @@
 
 /* ===== Channel lookup table ===== */
 const tsp_adc_channel_t tsp_adc_channels[ADC_CH_COUNT] = {
-    { DL_ADC12_INPUT_CHAN_2, "VIN1", "ADC0-CH2  PA25" },
-    { DL_ADC12_INPUT_CHAN_3, "VIN3", "ADC0-CH3  PA24" },
-    { DL_ADC12_INPUT_CHAN_5, "VIN4", "ADC0-CH5  PB24" },
+    { DL_ADC12_INPUT_CHAN_2,  "VIN1", "ADC0-CH2  PA25" },
+    { DL_ADC12_INPUT_CHAN_11, "VIN2", "ADC1-CH11 PB23" },
+    { DL_ADC12_INPUT_CHAN_3,  "VIN3", "ADC0-CH3  PA24" },
+    { DL_ADC12_INPUT_CHAN_5,  "VIN4", "ADC0-CH5  PB24" },
+    { DL_ADC12_INPUT_CHAN_12, "VIN5", "ADC1-CH12 PA23" },
 };
+
+static ADC12_Regs *g_cur_adc = NULL;
+
+static ADC12_Regs *adc_inst_for(uint8_t ch_idx)
+{
+    if (ch_idx == ADC_CH_VIN2 || ch_idx == ADC_CH_VIN5)
+        return ADC12_1_INST;
+    return ADC12_0_INST;
+}
 
 /* ===== Init: configure extra analog pins ===== */
 void tsp_adc_init(void)
 {
-    /* SysConfig configures PA25 (PINCM55) for ADC0 CH2.
-     * Manually set the other two pins as analog inputs. */
-    DL_GPIO_initPeripheralAnalogFunction(IOMUX_PINCM54);  /* PA24, CH3 */
-    DL_GPIO_initPeripheralAnalogFunction(IOMUX_PINCM52);  /* PB24, CH5 */
+    /* SysConfig configures PA25 (PINCM55) for ADC0 CH2 and
+     * PB23 (PINCM51) for ADC1 CH11.
+     * Manually set the other pins as analog inputs. */
+    DL_GPIO_initPeripheralAnalogFunction(IOMUX_PINCM54);  /* PA24, ADC0 CH3 */
+    DL_GPIO_initPeripheralAnalogFunction(IOMUX_PINCM52);  /* PB24, ADC0 CH5 */
+    DL_GPIO_initPeripheralAnalogFunction(IOMUX_PINCM53);  /* PA23, ADC1 CH12 */
 }
 
 /* ===== Select ADC channel ===== */
@@ -21,9 +34,11 @@ void tsp_adc_select_channel(uint8_t ch_idx)
 {
     if (ch_idx >= ADC_CH_COUNT) return;
 
-    DL_ADC12_disableConversions(ADC12_0_INST);
+    g_cur_adc = adc_inst_for(ch_idx);
 
-    DL_ADC12_configConversionMem(ADC12_0_INST, DL_ADC12_MEM_IDX_0,
+    DL_ADC12_disableConversions(g_cur_adc);
+
+    DL_ADC12_configConversionMem(g_cur_adc, DL_ADC12_MEM_IDX_0,
         tsp_adc_channels[ch_idx].dl_chan,
         DL_ADC12_REFERENCE_VOLTAGE_VDDA_VSSA,
         DL_ADC12_SAMPLE_TIMER_SOURCE_SCOMP0,
@@ -32,7 +47,7 @@ void tsp_adc_select_channel(uint8_t ch_idx)
         DL_ADC12_TRIGGER_MODE_AUTO_NEXT,
         DL_ADC12_WINDOWS_COMP_MODE_DISABLED);
 
-    DL_ADC12_enableConversions(ADC12_0_INST);
+    DL_ADC12_enableConversions(g_cur_adc);
 }
 
 /* ===== Single blocking read (12-bit) ===== */
@@ -40,18 +55,18 @@ uint16_t tsp_adc_read_raw(void)
 {
     uint16_t result;
 
-    DL_ADC12_startConversion(ADC12_0_INST);
+    DL_ADC12_startConversion(g_cur_adc);
 
     while (!DL_ADC12_getRawInterruptStatus(
-               ADC12_0_INST, DL_ADC12_INTERRUPT_MEM0_RESULT_LOADED))
+               g_cur_adc, DL_ADC12_INTERRUPT_MEM0_RESULT_LOADED))
         ;
 
     DL_ADC12_clearInterruptStatus(
-        ADC12_0_INST, DL_ADC12_INTERRUPT_MEM0_RESULT_LOADED);
+        g_cur_adc, DL_ADC12_INTERRUPT_MEM0_RESULT_LOADED);
 
-    result = DL_ADC12_getMemResult(ADC12_0_INST, DL_ADC12_MEM_IDX_0);
+    result = DL_ADC12_getMemResult(g_cur_adc, DL_ADC12_MEM_IDX_0);
 
-    DL_ADC12_enableConversions(ADC12_0_INST);
+    DL_ADC12_enableConversions(g_cur_adc);
 
     return result;
 }
@@ -134,14 +149,14 @@ void tsp_adc_measure(tsp_adc_meas_t *out)
 
     /* Pass 1: fast burst (~4.9us/sample = 49 in 0.1us units) */
     for (i = 0; i < ADC_FREQ_BUF_SIZE; i++) {
-        DL_ADC12_startConversion(ADC12_0_INST);
+        DL_ADC12_startConversion(g_cur_adc);
         while (!DL_ADC12_getRawInterruptStatus(
-                   ADC12_0_INST, DL_ADC12_INTERRUPT_MEM0_RESULT_LOADED))
+                   g_cur_adc, DL_ADC12_INTERRUPT_MEM0_RESULT_LOADED))
             ;
         DL_ADC12_clearInterruptStatus(
-            ADC12_0_INST, DL_ADC12_INTERRUPT_MEM0_RESULT_LOADED);
-        g_freq_buf[i] = DL_ADC12_getMemResult(ADC12_0_INST, DL_ADC12_MEM_IDX_0);
-        DL_ADC12_enableConversions(ADC12_0_INST);
+            g_cur_adc, DL_ADC12_INTERRUPT_MEM0_RESULT_LOADED);
+        g_freq_buf[i] = DL_ADC12_getMemResult(g_cur_adc, DL_ADC12_MEM_IDX_0);
+        DL_ADC12_enableConversions(g_cur_adc);
     }
 
     out->freq_hz = freq_from_buf(ADC_FREQ_BUF_SIZE, 49, &vmax, &vmin, &dc_raw);
@@ -149,14 +164,14 @@ void tsp_adc_measure(tsp_adc_meas_t *out)
     if (out->freq_hz == 0) {
         /* Pass 2: slow burst (~200us/sample = 2000 in 0.1us units) */
         for (i = 0; i < ADC_FREQ_BUF_SIZE; i++) {
-            DL_ADC12_startConversion(ADC12_0_INST);
+            DL_ADC12_startConversion(g_cur_adc);
             while (!DL_ADC12_getRawInterruptStatus(
-                       ADC12_0_INST, DL_ADC12_INTERRUPT_MEM0_RESULT_LOADED))
+                       g_cur_adc, DL_ADC12_INTERRUPT_MEM0_RESULT_LOADED))
                 ;
             DL_ADC12_clearInterruptStatus(
-                ADC12_0_INST, DL_ADC12_INTERRUPT_MEM0_RESULT_LOADED);
-            g_freq_buf[i] = DL_ADC12_getMemResult(ADC12_0_INST, DL_ADC12_MEM_IDX_0);
-            DL_ADC12_enableConversions(ADC12_0_INST);
+                g_cur_adc, DL_ADC12_INTERRUPT_MEM0_RESULT_LOADED);
+            g_freq_buf[i] = DL_ADC12_getMemResult(g_cur_adc, DL_ADC12_MEM_IDX_0);
+            DL_ADC12_enableConversions(g_cur_adc);
             delay_cycles(15760);
         }
         out->freq_hz = freq_from_buf(ADC_FREQ_BUF_SIZE, 2000, &vmax, &vmin, &dc_raw);

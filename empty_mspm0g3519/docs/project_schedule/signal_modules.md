@@ -10,7 +10,7 @@
 | AD5933 阻抗测量 | 完整 | 部分 | 硬件阻断：R31 需换 20kΩ |
 | AD9833 DDS 信号源 | 完整 | 已通过 | 可用 |
 | AD8302 幅相检测 | 无代码 | 未验证 | 封存，有实施方案 |
-| 通用 ADC (J2 三路) | 完整 | 待验证 | ADC0: VIN1/VIN3/VIN4 |
+| 通用 ADC (J2 五路) | 完整 | 三路已验证 | ADC0+ADC1: VIN1~VIN5 |
 | 编码器 (旋钮) | 完整 | 在用 | 可用 |
 
 ## 各模块详情
@@ -45,17 +45,16 @@
 - **封存原因**：4 项阻断问题——PB14/PB13 非 ADC 引脚需飞线至 PA12/PA13、ADC 模式需改 Sequence、相位公式需修正、悬空验证无效
 - **实施方案**：文档中已记录修正方案（飞线接法、ADC0 配置、公式），可快速实现
 
-### 通用 ADC (J2 三路模拟输入)
+### 通用 ADC (J2 五路模拟输入)
 
 - **代码文件**：`NUEDC2025/tsp_adc.c/.h`
 - **应用入口**：`action_adc_test()` — 电压显示 + 频率测量 + 通道切换
-- **已实现通道**：VIN1(ADC0-CH2, PA25), VIN3(ADC0-CH3, PA24), VIN4(ADC0-CH5, PB24)
+- **已实现通道**：VIN1(ADC0-CH2, PA25), VIN2(ADC1-CH11, PB23), VIN3(ADC0-CH3, PA24), VIN4(ADC0-CH5, PB24), VIN5(ADC1-CH12, PA23)
 - **功能**：
   - 实时电压显示（12-bit ADC, 0~3300mV）
   - 频率测量（双速率 burst + 过零检测，~10Hz~165kHz）
-  - S0/S1 切换通道
-- **SysConfig**：ADC0, ULPCLK 40MHz, 2.5μs 采样时间, 轮询模式
-- **待扩展**：VIN2(ADC1-CH11, PB23), VIN5(ADC1-CH12, PA23) 需添加 ADC1 实例
+  - S0/S1 切换通道（五通道循环）
+- **SysConfig**：ADC0 + ADC1, ULPCLK 40MHz, 2.5μs 采样时间, 轮询模式
 - **硬件**：J2 排座，各路带 49.9Ω + 220pF 抗混叠滤波
 - **参考**：`development_reference/G3519_main_board.md` §5.1
 

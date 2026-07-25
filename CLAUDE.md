@@ -72,6 +72,7 @@ empty_mspm0g3519/
 | DDS GPIO | PC2(SCLK), PC3(SDATA), PC24(FSYNC) | `DDS_SCLK/SDATA/FSYNC` |
 | UART0 | PA10(TX), PA11(RX) | IOMUX_PINCM21/22 |
 | ADC0 (J2) | PA25(VIN1/CH2), PA24(VIN3/CH3), PB24(VIN4/CH5) | `ADC12_0_INST` |
+| ADC1 (J2) | PB23(VIN2/CH11), PA23(VIN5/CH12) | `ADC12_1_INST` |
 
 ## SysConfig 模块列表
 
@@ -89,6 +90,7 @@ empty_mspm0g3519/
 | UART1 | UART_0 | UART0, MFCLK 4MHz, PA10(TX)/PA11(RX) |
 | I2C1 | I2C_AD5933 | AD5933, 100kHz Controller, PA29(SCL)/PA30(SDA) |
 | ADC12 | ADC12_0 | ADC0, ULPCLK 40MHz, 2.5μs 采样, PA25(CH2), 轮询模式 |
+| ADC12 | ADC12_1 | ADC1, ULPCLK 40MHz, 2.5μs 采样, PB23(CH11), 轮询模式 |
 
 ## API 速查
 
@@ -166,7 +168,7 @@ tsp_dds_stop();                               // 停止 DDS 输出 (RESET)
 
 // ===== 通用 ADC（J2 三路，tsp_adc.c/.h）=====
 tsp_adc_init();                              // 配置 PA24/PB24 为模拟输入（PA25 由 SysConfig 配置）
-tsp_adc_select_channel(ADC_CH_VIN1);         // 切换通道: ADC_CH_VIN1(CH2), ADC_CH_VIN3(CH3), ADC_CH_VIN4(CH5)
+tsp_adc_select_channel(ADC_CH_VIN1);         // 切换通道: ADC_CH_VIN1(CH2), ADC_CH_VIN2(CH11), ADC_CH_VIN3(CH3), ADC_CH_VIN4(CH5), ADC_CH_VIN5(CH12)
 uint16_t raw = tsp_adc_read_raw();           // 单次 12-bit 采样（轮询模式）
 uint16_t mv  = tsp_adc_read_mv();            // 返回 mV（0~3300）
 uint16_t avg = tsp_adc_read_avg_mv(8);       // 8 次平均，返回 mV

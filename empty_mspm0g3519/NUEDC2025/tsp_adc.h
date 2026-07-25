@@ -5,9 +5,11 @@
 
 /* ===== Channel index (for tsp_adc_select_channel) ===== */
 #define ADC_CH_VIN1    0    /* ADC0 CH2,  PA25, J2 pin 1 */
-#define ADC_CH_VIN3    1    /* ADC0 CH3,  PA24, J2 pin 3 */
-#define ADC_CH_VIN4    2    /* ADC0 CH5,  PB24, J2 pin 4 */
-#define ADC_CH_COUNT   3
+#define ADC_CH_VIN2    1    /* ADC1 CH11, PB23, J2 pin 2 */
+#define ADC_CH_VIN3    2    /* ADC0 CH3,  PA24, J2 pin 3 */
+#define ADC_CH_VIN4    3    /* ADC0 CH5,  PB24, J2 pin 4 */
+#define ADC_CH_VIN5    4    /* ADC1 CH12, PA23, J2 pin 5 */
+#define ADC_CH_COUNT   5
 
 /* ===== Voltage conversion ===== */
 #define ADC_VREF_MV    3300
@@ -18,9 +20,9 @@
 
 /* ===== Channel metadata ===== */
 typedef struct {
-    uint32_t    dl_chan;
-    const char *label;
-    const char *detail;
+    uint32_t     dl_chan;
+    const char  *label;
+    const char  *detail;
 } tsp_adc_channel_t;
 
 extern const tsp_adc_channel_t tsp_adc_channels[ADC_CH_COUNT];

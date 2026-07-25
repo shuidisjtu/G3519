@@ -161,6 +161,17 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 #define GPIO_ADC12_0_IOMUX_C2                                    (IOMUX_PINCM55)
 #define GPIO_ADC12_0_IOMUX_C2_FUNC                (IOMUX_PINCM55_PF_UNCONNECTED)
 
+/* Defines for ADC12_1 */
+#define ADC12_1_INST                                                        ADC1
+#define ADC12_1_INST_IRQHandler                                  ADC1_IRQHandler
+#define ADC12_1_INST_INT_IRQN                                    (ADC1_INT_IRQn)
+#define ADC12_1_ADCMEM_0                                      DL_ADC12_MEM_IDX_0
+#define ADC12_1_ADCMEM_0_REF                DL_ADC12_REFERENCE_VOLTAGE_VDDA_VSSA
+#define GPIO_ADC12_1_C11_PORT                                              GPIOB
+#define GPIO_ADC12_1_C11_PIN                                      DL_GPIO_PIN_23
+#define GPIO_ADC12_1_IOMUX_C11                                   (IOMUX_PINCM51)
+#define GPIO_ADC12_1_IOMUX_C11_FUNC               (IOMUX_PINCM51_PF_UNCONNECTED)
+
 
 
 /* Port definition for Pin Group PORTB */
@@ -237,6 +248,7 @@ void SYSCFG_DL_I2C_AD5933_init(void);
 void SYSCFG_DL_UART_0_init(void);
 void SYSCFG_DL_LCD_init(void);
 void SYSCFG_DL_ADC12_0_init(void);
+void SYSCFG_DL_ADC12_1_init(void);
 
 void SYSCFG_DL_SYSTICK_init(void);
 

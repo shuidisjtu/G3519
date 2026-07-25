@@ -171,6 +171,16 @@ ADC121.adcMem0chansel              = "DL_ADC12_INPUT_CHAN_2";
 ADC121.peripheral.$assign          = "ADC0";
 ADC121.peripheral.adcPin2.$assign  = "PA25";
 
+const ADC122                        = ADC12.addInstance();
+ADC122.$name                        = "ADC12_1";
+ADC122.sampClkSrc                   = "DL_ADC12_CLOCK_ULPCLK";
+ADC122.sampClkDiv                   = "DL_ADC12_CLOCK_DIVIDE_1";
+ADC122.sampleTime0                  = "2.5 us";
+ADC122.powerDownMode                = "DL_ADC12_POWER_DOWN_MODE_MANUAL";
+ADC122.adcMem0chansel               = "DL_ADC12_INPUT_CHAN_11";
+ADC122.peripheral.$assign           = "ADC1";
+ADC122.peripheral.adcPin11.$assign  = "PB23";
+
 ProjectConfig.deviceSpin = "MSPM0G3519";
 
 /**
