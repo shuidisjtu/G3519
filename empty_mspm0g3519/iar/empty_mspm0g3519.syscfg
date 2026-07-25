@@ -9,6 +9,8 @@
 /**
  * Import the modules used in this configuration.
  */
+const ADC12         = scripting.addModule("/ti/driverlib/ADC12", {}, false);
+const ADC121        = ADC12.addInstance();
 const Board         = scripting.addModule("/ti/driverlib/Board");
 const GPIO          = scripting.addModule("/ti/driverlib/GPIO", {}, false);
 const GPIO1         = GPIO.addInstance();
@@ -159,6 +161,15 @@ SYSTICK.periodEnable    = true;
 SYSTICK.interruptEnable = true;
 SYSTICK.systickEnable   = true;
 SYSTICK.period          = 80000;
+
+ADC121.$name                       = "ADC12_0";
+ADC121.sampClkSrc                  = "DL_ADC12_CLOCK_ULPCLK";
+ADC121.sampClkDiv                  = "DL_ADC12_CLOCK_DIVIDE_1";
+ADC121.sampleTime0                 = "2.5 us";
+ADC121.powerDownMode               = "DL_ADC12_POWER_DOWN_MODE_MANUAL";
+ADC121.adcMem0chansel              = "DL_ADC12_INPUT_CHAN_2";
+ADC121.peripheral.$assign          = "ADC0";
+ADC121.peripheral.adcPin2.$assign  = "PA25";
 
 ProjectConfig.deviceSpin = "MSPM0G3519";
 

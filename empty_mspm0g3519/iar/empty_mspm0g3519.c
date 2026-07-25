@@ -7,6 +7,7 @@
 #include "tsp_encoder.h"
 #include "tsp_ad5933.h"
 #include "tsp_dds.h"
+#include "tsp_adc.h"
 #include <math.h>
 
 /* ===== Global state ===== */
@@ -162,6 +163,160 @@ static void action_dds_test(void)
 
 	/* Cleanup */
 	tsp_dds_stop();
+	tsp_menu_request_redraw();
+}
+
+/* ===== ADC Voltage / Frequency Test ===== */
+
+static void fmt_uint16(char *buf, uint8_t *p, uint16_t v, uint8_t digits)
+{
+	uint8_t d[5];
+	uint8_t i;
+	d[0] = (uint8_t)((v / 10000) % 10);
+	d[1] = (uint8_t)((v / 1000) % 10);
+	d[2] = (uint8_t)((v / 100) % 10);
+	d[3] = (uint8_t)((v / 10) % 10);
+	d[4] = (uint8_t)(v % 10);
+	for (i = 5 - digits; i < 5; i++)
+		buf[(*p)++] = (char)('0' + d[i]);
+}
+
+static void fmt_uint32(char *buf, uint8_t *p, uint32_t v, uint8_t digits)
+{
+	uint8_t d[7];
+	uint8_t i;
+	d[0] = (uint8_t)((v / 1000000) % 10);
+	d[1] = (uint8_t)((v / 100000) % 10);
+	d[2] = (uint8_t)((v / 10000) % 10);
+	d[3] = (uint8_t)((v / 1000) % 10);
+	d[4] = (uint8_t)((v / 100) % 10);
+	d[5] = (uint8_t)((v / 10) % 10);
+	d[6] = (uint8_t)(v % 10);
+	for (i = 7 - digits; i < 7; i++)
+		buf[(*p)++] = (char)('0' + d[i]);
+}
+
+static void action_adc_test(void)
+{
+	uint8_t  ch_idx     = 0;
+	uint8_t  last_ch    = 0xFF;
+	uint16_t last_vpp   = 0xFFFF;
+	uint16_t last_dc    = 0xFFFF;
+	uint32_t last_freq  = 0xFFFFFFFF;
+	uint8_t  meas_tick  = 0;
+	tsp_adc_meas_t meas;
+
+	tsp_adc_init();
+	tsp_adc_select_channel(0);
+
+	tsp_tft18_clear(BLACK);
+	tsp_tft18_draw_line_h(0, 16, 160, BLUE);
+	tsp_tft18_show_str_color(0, 7, (uint8_t *)"S0/S1:CH  PUSH:Exit ", GRAY1, BLACK);
+
+	while (1) {
+		tsp_key_scan();
+		if (tsp_key_pressed(KEY_PUSH)) break;
+
+		if (tsp_key_pressed(KEY_S0)) {
+			ch_idx = (ch_idx == 0) ? ADC_CH_COUNT - 1 : ch_idx - 1;
+		}
+		if (tsp_key_pressed(KEY_S1)) {
+			ch_idx = (ch_idx + 1 >= ADC_CH_COUNT) ? 0 : ch_idx + 1;
+		}
+
+		/* Channel change */
+		if (ch_idx != last_ch) {
+			tsp_adc_select_channel(ch_idx);
+
+			/* Row 0: title + channel label */
+			{
+				char buf[21]; uint8_t p = 0;
+				const char *s;
+				buf[p++] = 'A'; buf[p++] = 'D'; buf[p++] = 'C';
+				buf[p++] = ' '; buf[p++] = 'T'; buf[p++] = 'e';
+				buf[p++] = 's'; buf[p++] = 't'; buf[p++] = ' ';
+				buf[p++] = ' '; buf[p++] = '[';
+				for (s = tsp_adc_channels[ch_idx].label; *s; s++)
+					buf[p++] = *s;
+				buf[p++] = ']';
+				while (p < 20) buf[p++] = ' ';
+				buf[20] = '\0';
+				tsp_tft18_show_str_color(0, 0, (uint8_t *)buf, YELLOW, BLUE);
+			}
+
+			/* Row 2: channel detail */
+			{
+				char buf[21]; uint8_t p = 0;
+				const char *s;
+				for (s = tsp_adc_channels[ch_idx].detail; *s; s++)
+					buf[p++] = *s;
+				while (p < 20) buf[p++] = ' ';
+				buf[20] = '\0';
+				tsp_tft18_show_str_color(0, 2, (uint8_t *)buf, CYAN, BLACK);
+			}
+
+			last_ch   = ch_idx;
+			last_vpp  = 0xFFFF;
+			last_dc   = 0xFFFF;
+			last_freq = 0xFFFFFFFF;
+		}
+
+		/* Measurement every ~200ms */
+		meas_tick++;
+		if (meas_tick >= 20) {
+			meas_tick = 0;
+			tsp_adc_measure(&meas);
+
+			/* Row 3: Vpp */
+			if (meas.vpp_mv != last_vpp) {
+				char buf[21]; uint8_t p = 0;
+				buf[p++] = 'V'; buf[p++] = 'p'; buf[p++] = 'p';
+				buf[p++] = ':'; buf[p++] = ' '; buf[p++] = ' ';
+				fmt_uint16(buf, &p, meas.vpp_mv, 4);
+				buf[p++] = ' '; buf[p++] = 'm'; buf[p++] = 'V';
+				while (p < 20) buf[p++] = ' ';
+				buf[20] = '\0';
+				tsp_tft18_show_str_color(0, 3, (uint8_t *)buf, GREEN, BLACK);
+				last_vpp = meas.vpp_mv;
+			}
+
+			/* Row 4: DC offset */
+			if (meas.dc_mv != last_dc) {
+				char buf[21]; uint8_t p = 0;
+				buf[p++] = 'D'; buf[p++] = 'C'; buf[p++] = ':';
+				buf[p++] = ' '; buf[p++] = ' '; buf[p++] = ' ';
+				fmt_uint16(buf, &p, meas.dc_mv, 4);
+				buf[p++] = ' '; buf[p++] = 'm'; buf[p++] = 'V';
+				while (p < 20) buf[p++] = ' ';
+				buf[20] = '\0';
+				tsp_tft18_show_str_color(0, 4, (uint8_t *)buf, WHITE, BLACK);
+				last_dc = meas.dc_mv;
+			}
+
+			/* Row 5: Frequency */
+			if (meas.freq_hz != last_freq) {
+				char buf[21]; uint8_t p = 0;
+				buf[p++] = 'F'; buf[p++] = 'r'; buf[p++] = 'e';
+				buf[p++] = 'q'; buf[p++] = ':'; buf[p++] = ' ';
+				if (meas.freq_hz == 0) {
+					buf[p++] = '-'; buf[p++] = '-';
+					buf[p++] = ' '; buf[p++] = 'D'; buf[p++] = 'C';
+				} else {
+					uint32_t f = meas.freq_hz;
+					if (f > 9999999) f = 9999999;
+					fmt_uint32(buf, &p, f, 7);
+					buf[p++] = ' '; buf[p++] = 'H'; buf[p++] = 'z';
+				}
+				while (p < 20) buf[p++] = ' ';
+				buf[20] = '\0';
+				tsp_tft18_show_str_color(0, 5, (uint8_t *)buf, GREEN, BLACK);
+				last_freq = meas.freq_hz;
+			}
+		}
+
+		delay_1ms(10);
+	}
+
 	tsp_menu_request_redraw();
 }
 
@@ -363,6 +518,7 @@ exit_ad5933:
 static tsp_menu_item_t main_menu[] = {
 	{"AD5933 Test",    action_ad5933_test},
 	{"DDS Test",       action_dds_test},
+	{"ADC Test",       action_adc_test},
 };
 
 #define MAIN_MENU_COUNT  (sizeof(main_menu) / sizeof(main_menu[0]))

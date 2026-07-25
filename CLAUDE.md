@@ -71,6 +71,7 @@ empty_mspm0g3519/
 | AD5933 (I2C1) | PA29(SCL), PA30(SDA) | `I2C_AD5933_INST`（SysConfig 宏） |
 | DDS GPIO | PC2(SCLK), PC3(SDATA), PC24(FSYNC) | `DDS_SCLK/SDATA/FSYNC` |
 | UART0 | PA10(TX), PA11(RX) | IOMUX_PINCM21/22 |
+| ADC0 (J2) | PA25(VIN1/CH2), PA24(VIN3/CH3), PB24(VIN4/CH5) | `ADC12_0_INST` |
 
 ## SysConfig 模块列表
 
@@ -87,6 +88,7 @@ empty_mspm0g3519/
 | SPI1 | LCD | ST7735 LCD, BUSCLK, 10MHz, MOTO3 |
 | UART1 | UART_0 | UART0, MFCLK 4MHz, PA10(TX)/PA11(RX) |
 | I2C1 | I2C_AD5933 | AD5933, 100kHz Controller, PA29(SCL)/PA30(SDA) |
+| ADC12 | ADC12_0 | ADC0, ULPCLK 40MHz, 2.5μs 采样, PA25(CH2), 轮询模式 |
 
 ## API 速查
 
@@ -98,7 +100,7 @@ boot_animation();                      // 开机动画（色彩测试+启动信�
 tsp_encoder_init();                    // 编码器（默认禁用 PHA0 中断）
 // tsp_uart_init(115200);              // UART0 [已移除：脱机 NRST=2.5V 时 TX 阻塞，见 README 已知问题]
 tsp_key_init();                        // 按键
-tsp_menu_init(title, items, count);    // 菜单（AD5933 Test, DDS Test）
+tsp_menu_init(title, items, count);    // 菜单（AD5933 Test, DDS Test, ADC Test）
 
 // ===== GPIO 宏（tsp_gpio.h） =====
 LED_ON(); LED_OFF(); LED_TOGGLE();
@@ -161,6 +163,15 @@ tsp_dds_stop();                               // 停止 DDS 输出 (RESET)
 // 波形常量: AD9833_SINE, AD9833_TRIANGLE, AD9833_SQUARE
 // 无需 init: 首次 tsp_dds_set_output() 即完成初始化
 // DDS Test 交互: S0/S1 切换波形, 编码器调频率, PUSH 退出
+
+// ===== 通用 ADC（J2 三路，tsp_adc.c/.h）=====
+tsp_adc_init();                              // 配置 PA24/PB24 为模拟输入（PA25 由 SysConfig 配置）
+tsp_adc_select_channel(ADC_CH_VIN1);         // 切换通道: ADC_CH_VIN1(CH2), ADC_CH_VIN3(CH3), ADC_CH_VIN4(CH5)
+uint16_t raw = tsp_adc_read_raw();           // 单次 12-bit 采样（轮询模式）
+uint16_t mv  = tsp_adc_read_mv();            // 返回 mV（0~3300）
+uint16_t avg = tsp_adc_read_avg_mv(8);       // 8 次平均，返回 mV
+uint32_t hz  = tsp_adc_measure_freq();       // burst 采样 + 过零检测，返回 Hz（0=DC）
+// ADC Test 交互: S0/S1 切换通道, PUSH 退出
 ```
 
 ## IAR 关键路径

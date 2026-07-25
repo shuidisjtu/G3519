@@ -55,6 +55,7 @@ SYSCONFIG_WEAK void SYSCFG_DL_init(void)
     SYSCFG_DL_I2C_AD5933_init();
     SYSCFG_DL_UART_0_init();
     SYSCFG_DL_LCD_init();
+    SYSCFG_DL_ADC12_0_init();
     SYSCFG_DL_SYSTICK_init();
     /* Ensure backup structures have no valid state */
 
@@ -92,6 +93,7 @@ SYSCONFIG_WEAK void SYSCFG_DL_initPower(void)
     DL_I2C_reset(I2C_AD5933_INST);
     DL_UART_Main_reset(UART_0_INST);
     DL_SPI_reset(LCD_INST);
+    DL_ADC12_reset(ADC12_0_INST);
 
 
     DL_GPIO_enablePower(GPIOA);
@@ -100,6 +102,7 @@ SYSCONFIG_WEAK void SYSCFG_DL_initPower(void)
     DL_I2C_enablePower(I2C_AD5933_INST);
     DL_UART_Main_enablePower(UART_0_INST);
     DL_SPI_enablePower(LCD_INST);
+    DL_ADC12_enablePower(ADC12_0_INST);
 
     delay_cycles(POWER_STARTUP_DELAY);
 }
@@ -407,6 +410,23 @@ SYSCONFIG_WEAK void SYSCFG_DL_LCD_init(void) {
 
     /* Enable module */
     DL_SPI_enable(LCD_INST);
+}
+
+/* ADC12_0 Initialization */
+static const DL_ADC12_ClockConfig gADC12_0ClockConfig = {
+    .clockSel       = DL_ADC12_CLOCK_ULPCLK,
+    .divideRatio    = DL_ADC12_CLOCK_DIVIDE_1,
+    .freqRange      = DL_ADC12_CLOCK_FREQ_RANGE_32_TO_40,
+};
+SYSCONFIG_WEAK void SYSCFG_DL_ADC12_0_init(void)
+{
+    DL_ADC12_setClockConfig(ADC12_0_INST, (DL_ADC12_ClockConfig *) &gADC12_0ClockConfig);
+    DL_ADC12_configConversionMem(ADC12_0_INST, ADC12_0_ADCMEM_0,
+        DL_ADC12_INPUT_CHAN_2, DL_ADC12_REFERENCE_VOLTAGE_VDDA_VSSA, DL_ADC12_SAMPLE_TIMER_SOURCE_SCOMP0, DL_ADC12_AVERAGING_MODE_DISABLED,
+        DL_ADC12_BURN_OUT_SOURCE_DISABLED, DL_ADC12_TRIGGER_MODE_AUTO_NEXT, DL_ADC12_WINDOWS_COMP_MODE_DISABLED);
+    DL_ADC12_setPowerDownMode(ADC12_0_INST,DL_ADC12_POWER_DOWN_MODE_MANUAL);
+    DL_ADC12_setSampleTime0(ADC12_0_INST,100);
+    DL_ADC12_enableConversions(ADC12_0_INST);
 }
 
 SYSCONFIG_WEAK void SYSCFG_DL_SYSTICK_init(void)
