@@ -38,13 +38,16 @@ empty_mspm0g3519/
 │   ├── TSP_TFT18.h/.c                 ← TFT LCD 驱动（ST7735, 160×128, SPI1）
 │   └── tsp_menu.h/.c                  ← LCD 菜单系统（列表+子菜单+增量重绘）
 ├── NUEDC2025/                         ← 应用层驱动
-│   ├── tsp_isr.h/.c                   ← SysTick 延时 + GROUP1/UART0 中断分发
+│   ├── tsp_isr.h/.c                   ← SysTick 延时 + GROUP1/UART0/UART6 中断分发
 │   ├── tsp_key.h/.c                   ← 4 键扫描（20ms 消抖，边沿检测）
 │   ├── tsp_encoder.h/.c               ← 编码器（PHA0 中断正交解码，20ms 速度）
-│   ├── tsp_uart.h/.c                  ← UART0（MFCLK 4MHz, 115200-8N1, 环形缓冲 RX）
+│   ├── tsp_uart.h/.c                  ← UART0（MFCLK 4MHz, 115200-8N1, 超时 TX, 环形缓冲 RX）
+│   ├── tsp_uart6.h/.c                 ← UART6（BUSCLK 80MHz, J11 K230, 超时 TX, 环形缓冲 RX）
+│   ├── tsp_cmd.h/.c                   ← 文本命令协议（VER?/ADC/FREQ/DDS/FFT）
 │   ├── tsp_ad5933.h/.c                ← AD5933 阻抗测量（I2C1, 100kHz, 温度+扫频）
 │   ├── tsp_dds.h/.c                   ← AD9833 DDS 波形发生器（GPIO bit-bang, 方波/正弦/三角波）
-│   ├── tsp_adc.h/.c                   ← 通用 ADC（J2 五路, ADC0+ADC1, 电压/频率测量）
+│   ├── tsp_adc.h/.c                   ← 通用 ADC（J2 五路, ADC0+ADC1, 电压/频率/burst 采样）
+│   ├── tsp_fft.h/.c                   ← FFT 频谱分析（CMSIS-DSP Q15, 256 点, 频率/幅值/THD）
 │   └── tsp_ad8302.h/.c                ← [封存] AD8302 幅相检测（需 RF 信号，输入网络未焊）
 └── docs/                              ← 硬件文档与项目进度
     ├── development_reference/         ← 开发参考文档
@@ -73,6 +76,7 @@ empty_mspm0g3519/
 | AD5933 (I2C1) | PA29(SCL), PA30(SDA) | `I2C_AD5933_INST`（SysConfig 宏） |
 | DDS GPIO | PC2(SCLK), PC3(SDATA), PC24(FSYNC) | `DDS_SCLK/SDATA/FSYNC` |
 | UART0 | PA10(TX), PA11(RX) | IOMUX_PINCM21/22 |
+| UART6 (K230) | PC11(TX), PC10(RX) | J11, IOMUX_PINCM87/88 |
 | ADC0 (J2) | PA25(VIN1/CH2), PA24(VIN3/CH3), PB24(VIN4/CH5) | `ADC12_0_INST` |
 | ADC1 (J2) | PB23(VIN2/CH11), PA23(VIN5/CH12) | `ADC12_1_INST` |
 
@@ -90,6 +94,7 @@ empty_mspm0g3519/
 | GPIO3 | PORTC | 4 引脚：S1(PC0), DDS_SCLK(PC2), DDS_SDATA(PC3), DDS_FSYNC(PC24) |
 | SPI1 | LCD | ST7735 LCD, BUSCLK, 10MHz, MOTO3 |
 | UART1 | UART_0 | UART0, MFCLK 4MHz, PA10(TX)/PA11(RX) |
+| UART2 | UART_K230 | UART6, BUSCLK 80MHz, PC11(TX)/PC10(RX), J11 |
 | I2C1 | I2C_AD5933 | AD5933, 100kHz Controller, PA29(SCL)/PA30(SDA) |
 | ADC12 | ADC12_0 | ADC0, ULPCLK 40MHz, 2.5μs 采样, PA25(CH2), 轮询模式 |
 | ADC12 | ADC12_1 | ADC1, ULPCLK 40MHz, 2.5μs 采样, PB23(CH11), 轮询模式 |
@@ -102,8 +107,10 @@ SYSCFG_DL_init();                      // SysConfig 生成（GPIO/SPI/时钟/Sys
 tsp_tft18_init();                      // LCD
 boot_animation();                      // 开机动画（色彩测试+启动信息+蜂鸣器）
 tsp_encoder_init();                    // 编码器（默认禁用 PHA0 中断）
-// tsp_uart_init(115200);              // UART0 [已移除：脱机 NRST=2.5V 时 TX 阻塞，见 README 已知问题]
 tsp_key_init();                        // 按键
+tsp_uart_init(115200);                 // UART0（TX 已加 10ms 超时，脱机安全）
+tsp_uart_rx_enable();                  // 开启 RX 中断
+tsp_cmd_init(tsp_uart_send_string, tsp_uart_read_byte, tsp_uart_available); // 命令协议
 tsp_menu_init(title, items, count);    // 菜单（AD5933 Test, DDS Test, ADC Test）
 
 // ===== GPIO 宏（tsp_gpio.h） =====
@@ -136,15 +143,27 @@ int32_t cnt = tsp_encoder_get_count(); // 原子读取
 int16_t spd = tsp_encoder_get_speed(); // 脉冲/20ms
 tsp_encoder_reset();
 
-// ===== UART0（tsp_uart.c，时钟=MFCLK 4MHz，PD0 安全） =====
-// ⚠️ 已从 main() 移除：脱机（不接 DAPLink）时 NRST=2.5V 导致 MFCLK 不稳定，
-//    UART0 TX（含 printf）会永久阻塞。仅接 DAPLink 调试时可临时启用。见 README 已知问题。
-tsp_uart_init(115200);                  // SysConfig 预设后再调（仅改波特率+缓冲）
+// ===== UART0（tsp_uart.c，MFCLK 4MHz，TX 10ms 超时保护） =====
+tsp_uart_init(115200);                  // 波特率 + NVIC + 环形缓冲
+tsp_uart_rx_enable();                   // 开启 RX 中断
 tsp_uart_send_string("hello\r\n");
-printf("val=%d\n", x);                 // 已重定向到 UART0（__write → DL_UART_transmitDataBlocking）
-if (tsp_uart_available()) { uint8_t ch = tsp_uart_read_byte(); }
-tsp_uart_rx_enable();                   // 按需开启 RX 中断（防止浮空噪声风暴）
-tsp_uart_rx_disable();                  // 用完后关闭 RX 中断
+printf("val=%d\n", x);                 // 已重定向到 UART0（__write → 超时 TX）
+// TX 已加 10ms 超时：脱机（不接 DAPLink）时静默失败，MCU 不卡死
+
+// ===== UART6 K230（tsp_uart6.c，BUSCLK 80MHz，J11） =====
+tsp_uart6_init(115200);                 // 波特率 + NVIC + 环形缓冲
+tsp_uart6_rx_enable();
+tsp_uart6_send_string("hello\r\n");
+
+// ===== 文本命令协议（tsp_cmd.c） =====
+tsp_cmd_init(tsp_uart_send_string, tsp_uart_read_byte, tsp_uart_available);
+tsp_cmd_poll();                         // 主循环中调用，解析 RX 缓冲中的命令
+// 命令格式: CMD[,PARAM]\r\n → OK[,DATA]\r\n / ERR,msg\r\n
+// VER? → OK,G3519-Signal,v1.0
+// ADC,<1-5> → OK,<mV>
+// FREQ,<1-5> → OK,<Hz>
+// DDS,<freq>,<SINE|SQR|TRI> → OK    DDS,STOP → OK
+// FFT,<1-5>[,FAST|MED|SLOW] → OK,<freq_x10>,<amp_mv>,<thd_x10>,<dc_mv>,<fs_hz>
 
 // ===== AD5933 Impedance Analyzer（I2C1，详见 docs/AD5933_Use.md）=====
 tsp_ad5933_init();                           // 复位 + 外部时钟 + 待机
@@ -175,7 +194,18 @@ uint16_t raw = tsp_adc_read_raw();           // 单次 12-bit 采样（轮询模
 uint16_t mv  = tsp_adc_read_mv();            // 返回 mV（0~3300）
 uint16_t avg = tsp_adc_read_avg_mv(8);       // 8 次平均，返回 mV
 uint32_t hz  = tsp_adc_measure_freq();       // burst 采样 + 过零检测，返回 Hz（0=DC）
+uint16_t *tsp_adc_burst_sample(256, 0);  // burst 采样，返回缓冲区指针（delay=0 为最快）
 // ADC Test 交互: S0/S1 切换通道（五通道循环）, PUSH 退出
+
+// ===== FFT 频谱分析（tsp_fft.c，CMSIS-DSP arm_cfft_q15，256 点） =====
+tsp_fft_result_t res;
+tsp_fft_analyze(ADC_CH_VIN1, FFT_FS_MED, &res);
+// res.freq_x10  — 频率（0.1Hz 单位，含抛物线插值）
+// res.amp_mv    — 基频幅值 mV（时域 Vpp/2）
+// res.thd_x10   — THD（0.1% 单位）
+// res.dc_mv     — 直流偏置 mV
+// res.fs_hz     — 实际采样率 Hz
+// 速率预设: FFT_FS_FAST(~204kSPS), FFT_FS_MED(~5kSPS), FFT_FS_SLOW(~1.2kSPS)
 ```
 
 ## IAR 关键路径

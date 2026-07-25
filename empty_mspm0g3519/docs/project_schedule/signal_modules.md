@@ -11,6 +11,8 @@
 | AD9833 DDS 信号源 | 完整 | 已通过 | 可用（S2 退出保持输出） |
 | AD8302 幅相检测 | 完整（封存） | 未通过 | 封存：输入网络未焊 + 需 RF 信号 |
 | 通用 ADC (J2 五路) | 完整 | 已通过 | ADC0+ADC1: VIN1~VIN5 |
+| FFT 频谱分析 | 完整 | 已通过 | CMSIS-DSP Q15, 256 点, 频率/幅值/THD |
+| UART 命令协议 | 完整 | 已通过 | UART0→PC, UART6→K230(待验证) |
 | 编码器 (旋钮) | 完整 | 在用 | 可用 |
 
 ## 各模块详情
@@ -61,6 +63,31 @@
 - **SysConfig**：ADC0 + ADC1, ULPCLK 40MHz, 2.5μs 采样时间, 轮询模式
 - **硬件**：J2 排座，各路带 49.9Ω + 220pF 抗混叠滤波
 - **参考**：`development_reference/G3519_main_board.md` §5.1
+
+### FFT 频谱分析
+
+- **代码文件**：`NUEDC2025/tsp_fft.c/.h`
+- **依赖**：CMSIS-DSP `arm_cortexM0l_math.a`（SDK 自带），`tsp_adc` burst 采样
+- **功能**：
+  - 256 点 Q15 CFFT（`arm_cfft_q15`）
+  - 频率：抛物线插值 sub-bin 精度，0.1Hz 分辨率
+  - 幅值：时域 Vpp/2（mV）
+  - THD：2~8 次谐波相对基频
+  - 可变采样率：FAST(~204kSPS) / MED(~5kSPS) / SLOW(~1.2kSPS)
+- **已验证**（DDS→ADC 回环，SSCOM 115200-8N1）：
+  - 1kHz SINE: freq=1014.7Hz, amp=305mV, THD=0.4%
+  - 1kHz SQR: freq=1014.6Hz, amp=1650mV, THD=1.9%
+  - 500Hz SINE: freq=501.3Hz, 2kHz SINE: freq=2019.5Hz
+- **限制**：THD 精度受采样率约束（MED 下只能捕获有限谐波），FAST 模式 ms 级定时器分辨率导致 fs 计算误差
+
+### UART 命令协议
+
+- **代码文件**：`NUEDC2025/tsp_uart.c/.h`（UART0, 超时 TX）、`tsp_uart6.c/.h`（UART6）、`tsp_cmd.c/.h`（协议层）
+- **UART0→PC**：MFCLK 4MHz, PA10(TX)/PA11(RX), DAPLink 虚拟串口, 已验证
+- **UART6→K230**：BUSCLK 80MHz, PC11(TX)/PC10(RX), J11, SysConfig 已配置, 驱动已写, 待硬件验证
+- **TX 超时保护**：10ms 超时，脱机（不接 DAPLink）时静默失败不卡死
+- **命令集**：VER?, ADC, FREQ, DDS, FFT（详见 CLAUDE.md API 速查）
+- **已验证**：SSCOM 115200-8N1 全部命令 OK，脱机启动正常
 
 ### 编码器 (旋钮)
 
