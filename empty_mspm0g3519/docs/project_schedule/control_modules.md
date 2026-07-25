@@ -12,13 +12,16 @@
 | CCD 线阵（循迹） | 完整 | DC注入已验证 | 可用 |
 | 编码器（测速） | 完整 | 在用 | 可用 |
 | MPU6050 陀螺仪/IMU | 完整 | 已验证 | 可用 |
+| PID 控制器 | 完整 | 闭环菜单可用 | 可用 |
+| CCD 循迹算法 | 完整 | 待实物验证 | 可用 |
+| 里程计 | 完整 | 编码器已验证 | 可用 |
 
 ## 各模块详情
 
 ### DRV8874 电机驱动
 
 - **代码文件**：`NUEDC2025/tsp_motor.c/.h`
-- **应用入口**：`action_motor_test()` — 双电机独立控制、正反转、占空比调节
+- **应用入口**：`action_motor_openloop()` — 双电机独立控制、正反转、占空比调节；`action_motor_closeloop()` — PID 闭环速度控制
 - **硬件配置**：
   - TIMA0 PWM 20kHz (80MHz BUSCLK, period=3999)
   - M1: PB3(CCP0 PWM) + PB4(DIR GPIO)
@@ -102,6 +105,60 @@
 |------|---------|------|
 | 电机驱动 | DRV8874 | ✓ 代码完整 |
 | 视觉导航/色块追踪 | K230 | ✓ 已验证 |
-| CCD 循迹 | CCD + 循迹算法 | 驱动 ✓，算法待写 |
-| 速度闭环 | 编码器 + PID | 编码器 ✓，PID 待写 |
+| CCD 循迹 | CCD + 循迹算法 | ✓ 已实现（tsp_linefollow.c） |
+| 速度闭环 | 编码器 + PID | ✓ 已实现（tsp_pid.c 增量式 D-on-PV） |
 | 盲走/航向控制 | MPU6050 + Yaw 积分 | ✓ 已验证 |
+| 里程测量 | 编码器 + 里程计 | ✓ 已实现（tsp_odometer.c） |
+| PID 参数调整 | 编码器旋钮 + LCD | ✓ 已实现（Speed Setting 菜单） |
+
+## 新增模块详情
+
+### PID 控制器
+
+- **代码文件**：`NUEDC2025/tsp_pid.c/.h`
+- **两种形式**：
+  - **位置式 PID**：`tsp_pid_pos_step()` — 用于循迹转向 PD、速度 PD（Ki=0 时退化为 PD）
+  - **增量式 PID (D-on-PV)**：`tsp_pid_inc_step()` — 用于电机闭环速度控制，防止设定值突变时的微分冲击
+- **应用入口**：`action_motor_closeloop()` — 增量式 PID 闭环速度控制演示
+- **特性**：输出钳位、积分抗饱和、D-on-PV 防微分冲击
+- **移植来源**：HSP (HuashanPi) Ex6_pwm.c GD32F4xx 平台
+
+### CCD 循迹算法
+
+- **代码文件**：`NUEDC2025/tsp_linefollow.c/.h`
+- **应用入口**：`action_linefollow()` → `tsp_linefollow_demo()` — 交互式循迹（LCD 实时显示 + S2 启停）
+- **算法流程**：
+  1. CCD 128px 采集 → 扫描黑线左右边沿（亮暗阈值 + 宽度验证）
+  2. 中线误差 → PD 转向控制（IIR 平滑）
+  3. 编码器速度反馈 → PD 速度控制（帧间速率限制）
+  4. 差速驱动：`left_dc = dc + steer`, `right_dc = dc - steer`
+- **丢线保护**：≤3 帧保持上次位置、>3 帧渐减速度（线性衰减）、>13 帧完全停车
+- **参数调整**：`action_speed_setting()` 菜单（编码器旋钮微调 Kp/Kd/基础速度）
+- **移植来源**：HSP Project1_LineFollower.c
+
+### 里程计
+
+- **代码文件**：`NUEDC2025/tsp_odometer.c/.h`
+- **应用入口**：`action_odometer()` → `tsp_odometer_demo()` — 交互式里程计
+- **模式**：
+  - STRAIGHT：直线距离（cm），`pulse / COUNTS_PER_CM`
+  - ROTATE：旋转角度（deg），`pulse / COUNTS_PER_DEGREE`
+- **功能**：编码器脉冲积分、LCD 增量刷新（距离/角度/原始脉冲/速度）
+- **操作**：S0=直线模式、S1=旋转模式、S2=清零、PUSH=退出
+- **移植来源**：HSP Odometer.c GD32F4xx 平台
+
+## 代码质量审查记录（2026-07-25）
+
+两轮全量代码审查，共修复 56 项问题（6 CRITICAL + 10 HIGH + 16 MEDIUM + 24 LOW）：
+
+**关键修复**：
+- PID 微分/增量索引错误（CRITICAL）
+- UART 环形缓冲 volatile 竞态（HIGH）— `available()`/`read_byte()` 对 volatile 变量做单次快照
+- I2C 无 NACK 检测 + init 忽略 write_reg 返回值（HIGH）
+- INT_MIN 取反 UB（HIGH）— 用 unsigned 中间变量安全取反
+- sprintf 缓冲区溢出（MEDIUM）— 全部替换为 snprintf
+- 按键 debounce 边沿丢失（MEDIUM）— 仅在状态实际变化时更新 state_prev
+- 编码器 disable/enable 速度尖峰（MEDIUM）— static 局部变量移至文件作用域
+- 循迹 g_lost_frames uint8 回绕（MEDIUM）— 饱和递增
+- LCD draw_frame 右下角缺失（MEDIUM）— 使用 dx-1/dy-1 定位边框
+- 所有头文件 include guard 从保留标识符 `_X` 改为 `X_`

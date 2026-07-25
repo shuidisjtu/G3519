@@ -2,20 +2,24 @@
 
 基于 TI **MSPM0G3519SPZR**（Arm Cortex-M0+, 80MHz）的**控制题专用**开发平台，从 [G3519 基础平台](https://github.com/shuidisjtu/G3519) 拆分而来，专注小车/控制类赛题（NUEDC-2026 SAIS@SJTU）。
 
-集成 K230 视觉导航、CCD 循迹、DRV8874 双电机驱动，使用 IAR EWARM + DAPLink (CMSIS-DAP) 开发工具链。
+集成 K230 视觉导航、CCD 循迹、DRV8874 双电机驱动、MPU6050 IMU、PID 闭环控制，使用 IAR EWARM + DAPLink (CMSIS-DAP) 开发工具链。
 
 ## 功能概览
 
-启动后播放**开机动画**（色彩测试 -> 启动信息 -> LED 闪烁 + 蜂鸣器短响），然后进入 **TFT LCD 菜单界面**（4 项）：
+启动后播放**开机动画**（色彩测试 -> 启动信息 -> LED 闪烁 + 蜂鸣器短响），然后进入 **TFT LCD 菜单界面**（8 项）：
 
 | 菜单项 | 功能 |
 |---|---|
 | **K230 Test** | K230 视觉模块测试（UART6/J11 双向通信：接收 YbProtocol 颜色帧 + S0 发 $SWITCH# 切换颜色阈值，LCD 色块追踪画框） |
 | **CCD Test** | 线阵 CCD 测试（128 像素采集 + LCD 实时波形、连续/单拍模式、双通道切换、曝光调节） |
-| **Motor Test** | DRV8874 双电机驱动测试（TIMA0 PWM 20kHz，M1/M2 独立控制，正反转+占空比调节） |
+| **Motor OpenLoop** | DRV8874 双电机开环驱动测试（TIMA0 PWM 20kHz，M1/M2 独立控制，正反转+占空比调节） |
+| **Motor ClsLoop** | 电机 PID 闭环速度控制（增量式 D-on-PV PID，编码器反馈，目标速度可调） |
+| **Odometer** | 里程计（编码器积分：直线距离/旋转角度测量，LCD 实时显示） |
+| **Line Follow** | CCD 循迹（PD 转向 + PD 速度控制 + 差速驱动，丢线减速保护） |
 | **MPU6050 Test** | 六轴 IMU 测试（I2C0 轮询：加速度/陀螺仪原始数据 + Yaw 航向角积分） |
+| **Speed Setting** | PID 参数在线调整（编码器旋钮微调 Kp/Kd/基础速度，实时写入循迹模块） |
 
-> **Motor Test 操作**：S0/S1 调占空比(+-5%)、S2 切换方向(FWD/REV)、编码器左转=M2 右转=M1、PUSH 退出。
+> **Motor OpenLoop 操作**：S0/S1 调占空比(+-5%)、S2 切换方向(FWD/REV)、编码器左转=M2 右转=M1、PUSH 退出。
 > 必须打开 SW1 接通电池（VBAT）才能在输出端看到 PWM 波形。
 
 按键角色：**S0**=上移、**S1**=下移、**S2**=确认、**PUSH**=返回
@@ -76,11 +80,11 @@
 G3519_control/
 ├── empty_mspm0g3519/
 │   ├── iar/                             <- 工程根目录（$PROJ_DIR$）
-│   │   ├── empty_mspm0g3519.c           <- 主程序（开机动画 + 4 项菜单）
+│   │   ├── empty_mspm0g3519.c           <- 主程序（开机动画 + 8 项菜单）
 │   │   ├── empty_mspm0g3519.syscfg      <- SysConfig 引脚配置
 │   │   └── ti_msp_dl_config.c/.h        <- SysConfig 生成（勿手动编辑）
 │   ├── TSP3519/                          <- 板级支持库（LCD/GPIO/CCD/菜单）
-│   ├── NUEDC2025/                        <- 应用层驱动（电机/K230/编码器/按键/UART/MPU6050/ISR）
+│   ├── NUEDC2025/                        <- 应用层驱动（电机/K230/编码器/按键/UART/MPU6050/PID/循迹/里程计/ISR）
 │   ├── docs/                             <- 硬件文档与项目进度
 │   └── k230_scripts/                     <- K230 MicroPython 测试脚本
 └── k230_scripts/                         <- K230 脚本（根目录副本）

@@ -21,7 +21,7 @@ MSPM0G3519 控制题平台（NUEDC-2026 SAIS@SJTU），从 G3519 基础平台拆
 
 工程入口：`empty_mspm0g3519/iar/empty_mspm0g3519.c`。
 
-菜单项（4 项）：K230 Test、CCD Test、Motor Test、MPU6050 Test。
+菜单项（8 项）：K230 Test、CCD Test、Motor OpenLoop、Motor ClsLoop、Odometer、Line Follow、MPU6050 Test、Speed Setting。
 
 ## 工程结构
 
@@ -31,7 +31,7 @@ MSPM0G3519 控制题平台（NUEDC-2026 SAIS@SJTU），从 G3519 基础平台拆
 G3519_control/
 ├── empty_mspm0g3519/
 │   ├── iar/                              ← $PROJ_DIR$
-│   │   ├── empty_mspm0g3519.c            ← 主程序（开机动画 + 4 项菜单）
+│   │   ├── empty_mspm0g3519.c            ← 主程序（开机动画 + 8 项菜单）
 │   │   ├── empty_mspm0g3519.syscfg       ← SysConfig 配置
 │   │   └── ti_msp_dl_config.c/.h         ← SysConfig 生成（勿手动编辑）
 │   ├── TSP3519/                           ← 板级支持库
@@ -47,7 +47,10 @@ G3519_control/
 │   │   ├── tsp_uart_k230.h/.c             ← UART6（K230, BUSCLK 80MHz, 115200, 环形缓冲 RX）
 │   │   ├── tsp_k230.h/.c                  ← K230 YbProtocol 解析（主循环状态机, $...# 断帧）
 │   │   ├── tsp_motor.h/.c                 ← DRV8874 直流电机驱动（TIMA0 PWM, 20kHz, M1/M2独立控制）
-│   │   └── tsp_mpu6050.h/.c               ← MPU6050 六轴 IMU（I2C0 轮询, Yaw 积分）
+│   │   ├── tsp_mpu6050.h/.c               ← MPU6050 六轴 IMU（I2C0 轮询, Yaw 积分）
+│   │   ├── tsp_pid.h/.c                   ← PID 控制器（位置式 + 增量式 D-on-PV）
+│   │   ├── tsp_linefollow.h/.c            ← CCD 循迹（PD 转向 + PD 速度 + 差速驱动）
+│   │   └── tsp_odometer.h/.c              ← 里程计（编码器距离/角度测量）
 │   ├── docs/                              ← 硬件文档与项目进度
 │   │   ├── development_reference/         ← 开发参考（硬件手册、驱动使用说明）
 │   │   ├── project_schedule/              ← 项目进度（控制题模块进度表）
@@ -120,7 +123,7 @@ tsp_k230_init();                        // K230 协议解析器复位
 // tsp_ccd_init();                     // CCD 在 action_ccd_test() 中按需初始化
 // tsp_motor_init();                   // 电机在 action_motor_test() 中按需初始化
 tsp_key_init();                        // 按键
-tsp_menu_init(title, items, count);    // 菜单（4 项：K230/CCD/Motor/MPU6050 Test）
+tsp_menu_init(title, items, count);    // 菜单（8 项：K230/CCD/MotorOpen/MotorCls/Odom/LineFol/MPU/SpeedSet）
 
 // ===== GPIO 宏（tsp_gpio.h） =====
 LED_ON(); LED_OFF(); LED_TOGGLE();
@@ -175,8 +178,10 @@ tsp_uart_k230_send_string("...\n");     // G3519->K230 TX（阻塞式，115200 �
 tsp_uart_k230_rx_disable();             // 退出场景时关闭
 
 // ===== CCD（tsp_ccd.c）=====
-// 128 像素线阵 CCD，双通道：CCD1(J3: PB18-AO, PC9-SI, PB20-CLK), CCD2(J17: PB17-AO, PC4-SI, PC5-CLK)
-// ADC1 手动初始化 (非SysConfig): reset->enablePower->setClockConfig->initSeqSample
+// 128 像素线阵 CCD，4通道2组：
+//   Group1: CCD1(J3: PB18-AO, PC9-SI, PB20-CLK) + CCD2(PB19-AO)
+//   Group2: CCD3(J17: PB17-AO, PC4-SI, PC5-CLK) + CCD4(PA17-AO)
+// ADC1 via SysConfig（实例 CCD_ADC，序列模式 MEM0-3→CH5/6/4/2）
 // VREF = VDDA (3.3V)，BUSY 轮询带超时 (10000 cycles)
 ccd_data_t pixels;                     // uint16_t[128]，注意栈占用 256B
 tsp_ccd_init();                        // ADC1 (reset+power+clock) + GPIO -> 模拟/数字引脚
@@ -201,8 +206,8 @@ SLEEP_LOW();                                 // 禁用 H 桥
 
 // ===== MPU6050 六轴 IMU（tsp_mpu6050.c，I2C0 轮询，SysConfig IMU_I2C） =====
 // 硬件: I2C0 (PB21-SCL, PB22-SDA), 400kHz, AD0=GND(0x68), INT=PC8(未用)
-int8_t ok = tsp_mpu6050_init();              // 复位+配置寄存器，返回 0=成功 -1=WHO_AM_I 失败
-uint8_t id = tsp_mpu6050_who_am_i();         // 读 WHO_AM_I（应返回 0x68）
+int8_t ok = tsp_mpu6050_init();              // 复位+配置(检查每步write_reg)，校准gyroZ，返回 0=成功 -1=失败
+uint8_t id = tsp_mpu6050_who_am_i();         // 读 WHO_AM_I（成功=0x68，I2C失败=0xFF）
 mpu6050_raw_t mpu;
 tsp_mpu6050_read_raw(&mpu);                  // 14B 突发读：mpu.ax/ay/az/temp/gx/gy/gz (int16_t)
 tsp_mpu6050_yaw_enable();                    // 启用 Yaw 积分
@@ -211,6 +216,36 @@ float yaw = tsp_mpu6050_get_yaw();           // 当前 Yaw 角度（°）
 tsp_mpu6050_reset_yaw();                     // 清零 Yaw
 tsp_mpu6050_yaw_disable();                   // 禁用 Yaw 积分
 int16_t ofs = tsp_mpu6050_get_gz_offset();   // 校准偏移值（诊断用）
+
+// ===== PID 控制器（tsp_pid.c，位置式 + 增量式 D-on-PV） =====
+// 位置式：循迹转向 PD、速度 PD（Ki=0 时退化为 PD）
+pid_pos_t steer_pid;
+tsp_pid_pos_init(&steer_pid, kp, ki, kd, out_min, out_max, int_max);
+float out = tsp_pid_pos_step(&steer_pid, setpoint, measurement);
+tsp_pid_pos_reset(&steer_pid);
+
+// 增量式 D-on-PV：电机闭环速度控制（防设定值突变微分冲击）
+pid_inc_t spd_pid;
+tsp_pid_inc_init(&spd_pid, kp, ki, kd, out_min, out_max);
+float out = tsp_pid_inc_step(&spd_pid, setpoint, measurement, dt);
+tsp_pid_inc_reset(&spd_pid);
+
+// ===== CCD 循迹（tsp_linefollow.c，PD 转向 + PD 速度 + 差速驱动） =====
+// 算法：CCD 128px 扫描黑线边沿 → 中线误差 → PD 转向 + PD 速度 → 差速电机输出
+// 丢线保护：≤3帧保持、>3帧渐减、>13帧停车
+tsp_linefollow_init();                         // 初始化 CCD/PID/状态（电机/编码器由调用者初始化）
+lf_result_t lf;
+tsp_linefollow_process(CCD1, &lf);             // 采集+检测+PD计算，结果存入 lf
+tsp_linefollow_drive(&lf);                     // 将 lf 结果输出到电机（差速驱动）
+tsp_linefollow_demo();                         // 交互式循迹演示（LCD+按键，S2 启停）
+tsp_linefollow_set_speed(50);                  // 设置基础速度 (0-100)
+tsp_linefollow_set_steer_gains(kp, kd);        // 设置转向 PD 增益
+tsp_linefollow_set_speed_gains(kp, kd);        // 设置速度 PD 增益
+
+// ===== 里程计（tsp_odometer.c，编码器距离/角度测量） =====
+// 两种模式：STRAIGHT（直线距离 cm）、ROTATE（旋转角度 deg）
+// 编码器脉冲积分，LCD 增量刷新（距离/角度/原始脉冲/速度）
+tsp_odometer_demo();                           // 交互式里程计（S0:直线 S1:旋转 S2:清零 PUSH:退出）
 ```
 
 ## IAR 关键路径
