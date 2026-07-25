@@ -193,8 +193,9 @@ tsp_adc_select_channel(ADC_CH_VIN1);         // 切换通道: ADC_CH_VIN1(CH2), 
 uint16_t raw = tsp_adc_read_raw();           // 单次 12-bit 采样（轮询模式）
 uint16_t mv  = tsp_adc_read_mv();            // 返回 mV（0~3300）
 uint16_t avg = tsp_adc_read_avg_mv(8);       // 8 次平均，返回 mV
-uint32_t hz  = tsp_adc_measure_freq();       // burst 采样 + 过零检测，返回 Hz（0=DC）
-uint16_t *tsp_adc_burst_sample(256, 0);  // burst 采样，返回缓冲区指针（delay=0 为最快）
+tsp_adc_meas_t meas;
+tsp_adc_measure(&meas);                      // burst 采样 + 过零检测，结果含 freq_hz/vpp_mv/dc_mv/vmax_mv/vmin_mv
+uint16_t *buf = tsp_adc_burst_sample(256, 0);  // burst 采样，返回缓冲区指针（delay=0 为最快）
 // ADC Test 交互: S0/S1 切换通道（五通道循环）, PUSH 退出
 
 // ===== FFT 频谱分析（tsp_fft.c，CMSIS-DSP arm_cfft_q15，256 点） =====

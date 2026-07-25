@@ -13,6 +13,7 @@
 | [AD5933_Examine.md](development_reference/AD5933_Examine.md) | AD5933 功能验证指南：AD2 五步验证流程（I2C→库函数→温度→VOUT→校准） |
 | [AD9833_DDS_Use.md](development_reference/AD9833_DDS_Use.md) | AD9833 DDS 波形发生器使用说明：GPIO 接线、波形切换、编码器调频、AD2 验证 |
 | [AD8302_Use_Mothball.md](development_reference/AD8302_Use_Mothball.md) | AD8302 幅相检测 [封存：需飞线改硬件，有完整修正方案] |
+| [AD5933_Debug_Report.md](development_reference/AD5933_Debug_Report.md) | AD5933 调试报告：信号链增益问题分析，R31/R36 修复方案 |
 
 ## 项目进度
 
@@ -20,7 +21,7 @@
 
 | 文档 | 说明 |
 |---|---|
-| [signal_modules.md](project_schedule/signal_modules.md) | 信号题相关模块实现进度（AD5933/AD9833/AD8302/通用ADC） |
+| [signal_modules.md](project_schedule/signal_modules.md) | 信号题模块实现进度（AD5933/AD9833/ADC/FFT/UART 命令协议） |
 
 ## 软件文档
 
