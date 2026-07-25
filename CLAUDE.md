@@ -31,7 +31,7 @@ MSPM0G3519 控制题平台（NUEDC-2026 SAIS@SJTU），从 G3519 基础平台拆
 G3519_control/
 ├── empty_mspm0g3519/
 │   ├── iar/                              ← $PROJ_DIR$
-│   │   ├── empty_mspm0g3519.c            ← 主程序（开机动画 + 3 项菜单）
+│   │   ├── empty_mspm0g3519.c            ← 主程序（开机动画 + 4 项菜单）
 │   │   ├── empty_mspm0g3519.syscfg       ← SysConfig 配置
 │   │   └── ti_msp_dl_config.c/.h         ← SysConfig 生成（勿手动编辑）
 │   ├── TSP3519/                           ← 板级支持库
@@ -120,7 +120,7 @@ tsp_k230_init();                        // K230 协议解析器复位
 // tsp_ccd_init();                     // CCD 在 action_ccd_test() 中按需初始化
 // tsp_motor_init();                   // 电机在 action_motor_test() 中按需初始化
 tsp_key_init();                        // 按键
-tsp_menu_init(title, items, count);    // 菜单（3 项：K230/CCD/Motor Test）
+tsp_menu_init(title, items, count);    // 菜单（4 项：K230/CCD/Motor/MPU6050 Test）
 
 // ===== GPIO 宏（tsp_gpio.h） =====
 LED_ON(); LED_OFF(); LED_TOGGLE();
@@ -210,6 +210,7 @@ tsp_mpu6050_update_yaw();                    // 主循环调用（自节拍 10ms
 float yaw = tsp_mpu6050_get_yaw();           // 当前 Yaw 角度（°）
 tsp_mpu6050_reset_yaw();                     // 清零 Yaw
 tsp_mpu6050_yaw_disable();                   // 禁用 Yaw 积分
+int16_t ofs = tsp_mpu6050_get_gz_offset();   // 校准偏移值（诊断用）
 ```
 
 ## IAR 关键路径

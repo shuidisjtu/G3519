@@ -53,7 +53,7 @@
 | **编码器** | PHA0(PA14, 双边沿中断)、PHB0(PA15) |
 | **CCD** | 128 像素线阵 CCD 4 通道 2 组，SI/CLK GPIO + ADC1 序列采样（SysConfig） |
 | **电机驱动** | DRV8874x2（拓展板），TIMA0 PWM 20kHz，需 VBAT(SW1) |
-| **MPU6050** | 六轴 IMU（I2C0: PB21-SCL/PB22-SDA, 中断 PC8），驱动待开发 |
+| **MPU6050** | 六轴 IMU（I2C0: PB21-SCL/PB22-SDA, 400kHz 轮询），已验证 |
 | **UART** | UART0 调试：PA10/PA11；UART6->K230：PC10/PC11，J11 |
 | **调试器** | DAPLink (CMSIS-DAP v2) |
 | **供电** | USB-C，禁止多路同时供电 |
@@ -76,11 +76,11 @@
 G3519_control/
 ├── empty_mspm0g3519/
 │   ├── iar/                             <- 工程根目录（$PROJ_DIR$）
-│   │   ├── empty_mspm0g3519.c           <- 主程序（开机动画 + 3 项菜单）
+│   │   ├── empty_mspm0g3519.c           <- 主程序（开机动画 + 4 项菜单）
 │   │   ├── empty_mspm0g3519.syscfg      <- SysConfig 引脚配置
 │   │   └── ti_msp_dl_config.c/.h        <- SysConfig 生成（勿手动编辑）
 │   ├── TSP3519/                          <- 板级支持库（LCD/GPIO/CCD/菜单）
-│   ├── NUEDC2025/                        <- 应用层驱动（电机/K230/编码器/按键/UART/ISR）
+│   ├── NUEDC2025/                        <- 应用层驱动（电机/K230/编码器/按键/UART/MPU6050/ISR）
 │   ├── docs/                             <- 硬件文档与项目进度
 │   └── k230_scripts/                     <- K230 MicroPython 测试脚本
 └── k230_scripts/                         <- K230 脚本（根目录副本）
