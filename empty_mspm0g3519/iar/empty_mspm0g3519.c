@@ -8,6 +8,8 @@
 #include "tsp_ad5933.h"
 #include "tsp_dds.h"
 #include "tsp_adc.h"
+#include "tsp_uart.h"
+#include "tsp_cmd.h"
 #include <math.h>
 
 /* ===== Global state ===== */
@@ -571,10 +573,17 @@ int main(void)
 	tsp_encoder_init();
 
 	tsp_key_init();
+
+	/* UART0 → PC (via DAPLink), with TX timeout protection */
+	tsp_uart_init(115200);
+	tsp_uart_rx_enable();
+	tsp_cmd_init(tsp_uart_send_string, tsp_uart_read_byte, tsp_uart_available);
+
 	tsp_menu_init("== Signal 2026 ==", main_menu, MAIN_MENU_COUNT);
 
 	while (1) {
 		tsp_key_scan();
+		tsp_cmd_poll();
 		tsp_menu_run();
 		delay_1ms(10);
 	}

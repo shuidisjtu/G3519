@@ -1179,6 +1179,18 @@
         <file>
             <name>$PROJ_DIR$\..\NUEDC2025\tsp_adc.h</name>
         </file>
+        <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_uart6.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_uart6.h</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_cmd.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_cmd.h</name>
+        </file>
     </group>
     <group>
         <name>SysConfig Generated Files</name>
