@@ -76,7 +76,7 @@ G3519_control/
 | 按键 | PA18(S0), PC0(S1), PA16(S2), PA12(PUSH) | `S0()/S1()/S2()/PUSH()` |
 | 编码器 | PA14(PHA0), PA15(PHB0) | `PHA0()/PHB0()` |
 | CCD 数字 | PC9(SI1), PB20(CLK1), PC4(SI2), PC5(CLK2) | `CCD_SI1/CLK1/SI2/CLK2` |
-| CCD ADC | PB18(CH5-CCD1), PB17(CH4-CCD2) | ADC1 序列采样 (MEM0/1 -> CH5/4) |
+| CCD ADC | PB18(CH5-CCD1), PB19(CH6-CCD2), PB17(CH4-CCD3), PA17(CH2-CCD4) | `CCD_ADC_INST`=ADC1 (SysConfig) |
 | 电机 PWM | PB3(CCP0), PB0(CCP2) | `MOTOR_PWM_INST`=TIMA0 |
 | 电机 DIR | PB4(M1DIR), PB2(M2DIR) | `PORTB_M1DIR/M2DIR_PIN` |
 | 电源控制 | PB1(SLEEP), PA7(FAULT) | `SLEEP_HIGH/LOW`, `FAULT()` |
@@ -99,10 +99,10 @@ G3519_control/
 | SPI1 | LCD | ST7735 LCD（BUSCLK, 10MHz, PB30/PB31/PB14） |
 | UART1 | UART_0 | 调试串口（MFCLK 4MHz, PA10/PA11） |
 | UART2 | UART_K230 | K230 视觉模块（BUSCLK 80MHz, 115200, PC10/PC11） |
+| ADC12 | CCD_ADC | CCD 模拟采样（ADC1, ULPCLK/8, 序列 MEM0-3→CH5/6/4/2） |
 
 **手动初始化（不在 SysConfig 中）**：
 - **TIMA0**：电机 PWM（20kHz），在 `tsp_motor_init()` 中手动配置
-- **ADC1**：CCD 模拟采样，在 `tsp_ccd_init()` 中手动配置
 
 **待添加**：
 - **I2C0**：MPU6050 六轴 IMU（PB21-SCL, PB22-SDA），需在 SysConfig 中添加后开发驱动

@@ -9,6 +9,8 @@
 /**
  * Import the modules used in this configuration.
  */
+const ADC12         = scripting.addModule("/ti/driverlib/ADC12", {}, false);
+const ADC121        = ADC12.addInstance();
 const Board         = scripting.addModule("/ti/driverlib/Board");
 const GPIO          = scripting.addModule("/ti/driverlib/GPIO", {}, false);
 const GPIO1         = GPIO.addInstance();
@@ -58,6 +60,23 @@ pinFunction6.inputFreq = 32.768;
 pinFunction6.enable    = true;
 
 Board.configureVDDA = true;
+
+ADC121.$name                 = "CCD_ADC";
+ADC121.sampClkSrc            = "DL_ADC12_CLOCK_ULPCLK";
+ADC121.sampClkDiv            = "DL_ADC12_CLOCK_DIVIDE_8";
+ADC121.powerDownMode         = "DL_ADC12_POWER_DOWN_MODE_MANUAL";
+ADC121.samplingOperationMode = "sequence";
+ADC121.endAdd                = 3;
+ADC121.sampleTime0           = "40 us";
+ADC121.adcMem0chansel        = "DL_ADC12_INPUT_CHAN_5";
+ADC121.adcMem1chansel        = "DL_ADC12_INPUT_CHAN_6";
+ADC121.adcMem2chansel        = "DL_ADC12_INPUT_CHAN_4";
+ADC121.adcMem3chansel        = "DL_ADC12_INPUT_CHAN_2";
+ADC121.adcPin5Config.$name   = "CCD1_AO";
+ADC121.adcPin6Config.$name   = "CCD2_AO";
+ADC121.adcPin4Config.$name   = "CCD3_AO";
+ADC121.adcPin2Config.$name   = "CCD4_AO";
+ADC121.peripheral.$assign    = "ADC1";
 
 GPIO1.port                           = "PORTB";
 GPIO1.$name                          = "PORTB";
@@ -206,3 +225,7 @@ GPIO3.associatedPins[0].pin.$suggestSolution       = "PC9";
 GPIO3.associatedPins[1].pin.$suggestSolution       = "PC4";
 GPIO3.associatedPins[2].pin.$suggestSolution       = "PC5";
 GPIO3.associatedPins[3].pin.$suggestSolution       = "PC0";
+ADC121.peripheral.adcPin5.$suggestSolution          = "PB18";
+ADC121.peripheral.adcPin6.$suggestSolution          = "PB19";
+ADC121.peripheral.adcPin4.$suggestSolution          = "PB17";
+ADC121.peripheral.adcPin2.$suggestSolution          = "PA17";

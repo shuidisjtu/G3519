@@ -853,7 +853,7 @@
                 </option>
                 <option>
                     <name>IlinkProgramEntryLabel</name>
-                    <state></state>
+                    <state>__iar_program_start</state>
                 </option>
                 <option>
                     <name>DoFill</name>
@@ -1026,7 +1026,7 @@
                 </option>
                 <option>
                     <name>IlinkTrustzoneImportLibraryOut</name>
-                    <state>###Unitialized###</state>
+                    <state>empty_mspm0g3519_nortos_iar_import_lib.o</state>
                 </option>
                 <option>
                     <name>OILinkExtraOption</name>
@@ -1150,10 +1150,22 @@
             <name>$PROJ_DIR$\..\NUEDC2025\tsp_isr.h</name>
         </file>
         <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_k230.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_k230.h</name>
+        </file>
+        <file>
             <name>$PROJ_DIR$\..\NUEDC2025\tsp_key.c</name>
         </file>
         <file>
             <name>$PROJ_DIR$\..\NUEDC2025\tsp_key.h</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_motor.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_motor.h</name>
         </file>
         <file>
             <name>$PROJ_DIR$\..\NUEDC2025\tsp_uart.c</name>
@@ -1166,18 +1178,6 @@
         </file>
         <file>
             <name>$PROJ_DIR$\..\NUEDC2025\tsp_uart_k230.h</name>
-        </file>
-        <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_k230.c</name>
-        </file>
-        <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_k230.h</name>
-        </file>
-        <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_motor.c</name>
-        </file>
-        <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_motor.h</name>
         </file>
     </group>
     <group>

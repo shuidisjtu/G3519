@@ -4,11 +4,11 @@
 #include "tsp_common_headfile.h"
 
 /* ===== 128-Pixel Linear CCD Driver for MSPM0G3519 =====
- * Supports dual CCD sensors (CCD1 and CCD2).
- * Pin mapping (verified against M0G3519 schematics):
- *   CCD1(J3):  AO=PB18(ADC1 CH5), SI=PC9,  CLK=PB20
- *   CCD2(J17): AO=PB17(ADC1 CH4), SI=PC4,  CLK=PC5
- * ADC1 sequence mode: MEM0→CH5, MEM1→CH4, manual sample, software trigger.
+ * Supports 4 CCD sensors in 2 groups sharing SI/CLK:
+ *   Group1: CCD1(PB18,CH5) + CCD2(PB19,CH6), SI1=PC9, CLK1=PB20
+ *   Group2: CCD3(PB17,CH4) + CCD4(PA17,CH2), SI2=PC4, CLK2=PC5
+ * ADC1 configured via SysConfig (instance: CCD_ADC).
+ * Sequence mode: MEM0→CH5, MEM1→CH6, MEM2→CH4, MEM3→CH2.
  */
 
 #define CCD_PIXELS  128U              /* pixel count */
@@ -16,6 +16,8 @@
 /* CCD channel IDs */
 #define CCD1        1
 #define CCD2        2
+#define CCD3        3
+#define CCD4        4
 
 typedef uint16_t ccd_data_t[CCD_PIXELS];
 

@@ -94,22 +94,6 @@ extern "C" {
 bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 
 
-
-/* Defines for I2C_AD5933 */
-#define I2C_AD5933_INST                                                     I2C1
-#define I2C_AD5933_INST_IRQHandler                               I2C1_IRQHandler
-#define I2C_AD5933_INST_INT_IRQN                                   I2C1_INT_IRQn
-#define I2C_AD5933_BUS_SPEED_HZ                                           100000
-#define GPIO_I2C_AD5933_SDA_PORT                                           GPIOA
-#define GPIO_I2C_AD5933_SDA_PIN                                   DL_GPIO_PIN_30
-#define GPIO_I2C_AD5933_IOMUX_SDA                                 (IOMUX_PINCM5)
-#define GPIO_I2C_AD5933_IOMUX_SDA_FUNC                  IOMUX_PINCM5_PF_I2C1_SDA
-#define GPIO_I2C_AD5933_SCL_PORT                                           GPIOA
-#define GPIO_I2C_AD5933_SCL_PIN                                   DL_GPIO_PIN_29
-#define GPIO_I2C_AD5933_IOMUX_SCL                                 (IOMUX_PINCM4)
-#define GPIO_I2C_AD5933_IOMUX_SCL_FUNC                  IOMUX_PINCM4_PF_I2C1_SCL
-
-
 /* Defines for UART_0 */
 #define UART_0_INST                                                        UART0
 #define UART_0_INST_FREQUENCY                                            4000000
@@ -163,6 +147,37 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 #define GPIO_LCD_SCLK_PIN                                        DL_GPIO_PIN_31
 #define GPIO_LCD_IOMUX_SCLK                                     (IOMUX_PINCM68)
 #define GPIO_LCD_IOMUX_SCLK_FUNC                     IOMUX_PINCM68_PF_SPI1_SCLK
+
+
+
+/* Defines for CCD_ADC */
+#define CCD_ADC_INST                                                        ADC1
+#define CCD_ADC_INST_IRQHandler                                  ADC1_IRQHandler
+#define CCD_ADC_INST_INT_IRQN                                    (ADC1_INT_IRQn)
+#define CCD_ADC_ADCMEM_0                                      DL_ADC12_MEM_IDX_0
+#define CCD_ADC_ADCMEM_0_REF                DL_ADC12_REFERENCE_VOLTAGE_VDDA_VSSA
+#define CCD_ADC_ADCMEM_1                                      DL_ADC12_MEM_IDX_1
+#define CCD_ADC_ADCMEM_1_REF                DL_ADC12_REFERENCE_VOLTAGE_VDDA_VSSA
+#define CCD_ADC_ADCMEM_2                                      DL_ADC12_MEM_IDX_2
+#define CCD_ADC_ADCMEM_2_REF                DL_ADC12_REFERENCE_VOLTAGE_VDDA_VSSA
+#define CCD_ADC_ADCMEM_3                                      DL_ADC12_MEM_IDX_3
+#define CCD_ADC_ADCMEM_3_REF                DL_ADC12_REFERENCE_VOLTAGE_VDDA_VSSA
+#define GPIO_CCD_ADC_C5_PORT                                               GPIOB
+#define GPIO_CCD_ADC_C5_PIN                                       DL_GPIO_PIN_18
+#define GPIO_CCD_ADC_IOMUX_C5                                    (IOMUX_PINCM44)
+#define GPIO_CCD_ADC_IOMUX_C5_FUNC                (IOMUX_PINCM44_PF_UNCONNECTED)
+#define GPIO_CCD_ADC_C6_PORT                                               GPIOB
+#define GPIO_CCD_ADC_C6_PIN                                       DL_GPIO_PIN_19
+#define GPIO_CCD_ADC_IOMUX_C6                                    (IOMUX_PINCM45)
+#define GPIO_CCD_ADC_IOMUX_C6_FUNC                (IOMUX_PINCM45_PF_UNCONNECTED)
+#define GPIO_CCD_ADC_C4_PORT                                               GPIOB
+#define GPIO_CCD_ADC_C4_PIN                                       DL_GPIO_PIN_17
+#define GPIO_CCD_ADC_IOMUX_C4                                    (IOMUX_PINCM43)
+#define GPIO_CCD_ADC_IOMUX_C4_FUNC                (IOMUX_PINCM43_PF_UNCONNECTED)
+#define GPIO_CCD_ADC_C2_PORT                                               GPIOA
+#define GPIO_CCD_ADC_C2_PIN                                       DL_GPIO_PIN_17
+#define GPIO_CCD_ADC_IOMUX_C2                                    (IOMUX_PINCM39)
+#define GPIO_CCD_ADC_IOMUX_C2_FUNC                (IOMUX_PINCM39_PF_UNCONNECTED)
 
 
 
@@ -239,15 +254,6 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 /* Defines for S1: GPIOC.0 with pinCMx 74 on package pin 56 */
 #define PORTC_S1_PIN                                             (DL_GPIO_PIN_0)
 #define PORTC_S1_IOMUX                                           (IOMUX_PINCM74)
-/* Defines for DDS_SCLK: GPIOC.2 with pinCMx 76 on package pin 65 */
-#define PORTC_DDS_SCLK_PIN                                       (DL_GPIO_PIN_2)
-#define PORTC_DDS_SCLK_IOMUX                                     (IOMUX_PINCM76)
-/* Defines for DDS_SDATA: GPIOC.3 with pinCMx 77 on package pin 66 */
-#define PORTC_DDS_SDATA_PIN                                      (DL_GPIO_PIN_3)
-#define PORTC_DDS_SDATA_IOMUX                                    (IOMUX_PINCM77)
-/* Defines for DDS_FSYNC: GPIOC.24 with pinCMx 83 on package pin 62 */
-#define PORTC_DDS_FSYNC_PIN                                     (DL_GPIO_PIN_24)
-#define PORTC_DDS_FSYNC_IOMUX                                    (IOMUX_PINCM83)
 
 
 
@@ -260,10 +266,10 @@ void SYSCFG_DL_GPIO_init(void);
 void SYSCFG_DL_SYSCTL_init(void);
 
 bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
-void SYSCFG_DL_I2C_AD5933_init(void);
 void SYSCFG_DL_UART_0_init(void);
 void SYSCFG_DL_UART_K230_init(void);
 void SYSCFG_DL_LCD_init(void);
+void SYSCFG_DL_CCD_ADC_init(void);
 
 void SYSCFG_DL_SYSTICK_init(void);
 

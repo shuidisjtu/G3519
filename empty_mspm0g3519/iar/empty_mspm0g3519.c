@@ -310,7 +310,7 @@ static void action_ccd_test(void)
 #define CCD_WF_H     63U
 #define CCD_WF_Y1    (CCD_WF_Y0 + CCD_WF_H - 1)   /* 111 */
 
-	ccd_data_t ccd_raw, ccd_prev;
+	ccd_data_t ccd_raw;
 	uint8_t    ccd_ch    = CCD1;
 	uint8_t    exp_ms    = 10;
 	uint8_t    redraw    = 1;
@@ -325,10 +325,8 @@ static void action_ccd_test(void)
 	tsp_ccd_set_exposure(exp_ms);
 
 	/* Clear previous frame buffer */
-	for (i = 0; i < CCD_PIXELS; i++) {
-		ccd_prev[i] = 0xFFFF;  /* impossible value -> force first draw */
-		ccd_raw[i]  = 0;
-	}
+	for (i = 0; i < CCD_PIXELS; i++)
+		ccd_raw[i] = 0;
 
 	/* Draw static UI */
 	tsp_tft18_clear(BLACK);
@@ -362,10 +360,6 @@ static void action_ccd_test(void)
 				if (enc != 0) {
 					cont_mode = !cont_mode;
 					redraw = 1;
-					if (!cont_mode) {
-						/* Switching to SNGL: invalidate prev to force full redraw on next capture */
-						for (i = 0; i < CCD_PIXELS; i++) ccd_prev[i] = 0xFFFF;
-					}
 					tsp_encoder_reset();
 				}
 			}
@@ -377,7 +371,6 @@ static void action_ccd_test(void)
 			/* S2: toggle CCD channel (1<->2) */
 			if (k_s2) {
 				ccd_ch = (ccd_ch == CCD1) ? CCD2 : CCD1;
-				for (i = 0; i < CCD_PIXELS; i++) ccd_prev[i] = 0xFFFF;
 				redraw = 1;
 			}
 
@@ -460,27 +453,39 @@ static void action_ccd_test(void)
 			redraw = 0;
 		}
 
-		/* Draw waveform (only when new data captured) */
+		/* Draw waveform: batch-clear area then draw connected segments */
 		if (captured) {
+			uint8_t prev_y;
+			uint16_t n;
+
+			/* Fast clear: set_region once, stream BLACK pixels */
+			tsp_tft18_set_region(CCD_WF_X, CCD_WF_Y0,
+				CCD_WF_X + CCD_PIXELS - 1, CCD_WF_Y1);
+			for (n = 0; n < (uint16_t)CCD_PIXELS * CCD_WF_H; n++)
+				tsp_tft18_write_2byte(BLACK);
+
+			/* Draw connected waveform on clean background */
+			prev_y = 0;
 			for (i = 0; i < CCD_PIXELS; i++) {
 				uint8_t y_new = CCD_WF_Y1 -
 					(uint8_t)(((uint32_t)ccd_raw[i] * CCD_WF_H) / 4096U);
-				uint8_t y_old;
+				if (y_new < CCD_WF_Y0) y_new = CCD_WF_Y0;
+				if (y_new > CCD_WF_Y1) y_new = CCD_WF_Y1;
 
-				if (ccd_prev[i] == 0xFFFF) {
-					/* First draw after channel switch: no erasure needed */
-					tsp_tft18_draw_pixel(CCD_WF_X + i, y_new, CYAN);
+				if (i == 0) {
+					tsp_tft18_draw_pixel(CCD_WF_X, y_new, CYAN);
 				} else {
-					y_old = CCD_WF_Y1 -
-						(uint8_t)(((uint32_t)ccd_prev[i] * CCD_WF_H) / 4096U);
-					if (y_new != y_old) {
-						/* Erase old pixel, draw new */
-						tsp_tft18_draw_pixel(CCD_WF_X + i, y_old, BLACK);
-						tsp_tft18_draw_pixel(CCD_WF_X + i, y_new, CYAN);
+					uint8_t ya = (prev_y < y_new) ? prev_y : y_new;
+					uint8_t yb = (prev_y > y_new) ? prev_y : y_new;
+					tsp_tft18_set_region(CCD_WF_X + i, ya,
+						CCD_WF_X + i, yb);
+					{
+						uint8_t y;
+						for (y = ya; y <= yb; y++)
+							tsp_tft18_write_2byte(CYAN);
 					}
-					/* else: pixel at same position, no change needed */
 				}
-				ccd_prev[i] = ccd_raw[i];
+				prev_y = y_new;
 			}
 		}
 

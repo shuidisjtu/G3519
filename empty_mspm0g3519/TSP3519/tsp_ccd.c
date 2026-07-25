@@ -4,83 +4,21 @@
 #include <intrinsics.h>
 
 /* ===== ADC12 Configuration =====
- * CCD analog input pins (verified against M0G3519 schematics):
- *   CCD1_AO -> PB18 (ADC1 CH5, J3)
- *   CCD2_AO -> PB17 (ADC1 CH4, J17)
- * ADC1 is configured manually (not via SysConfig).
+ * CCD analog input pins (per board schematic):
+ *   CCD1_AO -> PB18 (ADC1 CH5)    Group1: SI1(PC9), CLK1(PB20)
+ *   CCD2_AO -> PB19 (ADC1 CH6)    Group1: SI1(PC9), CLK1(PB20)
+ *   CCD3_AO -> PB17 (ADC1 CH4)    Group2: SI2(PC4), CLK2(PC5)
+ *   CCD4_AO -> PA17 (ADC1 CH2)    Group2: SI2(PC4), CLK2(PC5)
+ * ADC1 is configured via SysConfig (instance: CCD_ADC).
+ * Sequence mode: MEM0→CH5, MEM1→CH6, MEM2→CH4, MEM3→CH2.
  */
 
 /* Exposure time between flush and snapshot (ms) */
 static uint8_t g_ccd_exposure_ms = 10;
 
-/* ─── Internal: ADC init ─── */
-
-static const DL_ADC12_ClockConfig gCcdAdcClockConfig = {
-    .clockSel    = DL_ADC12_CLOCK_ULPCLK,
-    .divideRatio = DL_ADC12_CLOCK_DIVIDE_8,
-    .freqRange   = DL_ADC12_CLOCK_FREQ_RANGE_24_TO_32,
-};
-
-static void ccd_adc_init(void)
-{
-    /* 1. Configure IOMUX for analog function on PB18 and PB17 */
-    DL_GPIO_initPeripheralAnalogFunction(IOMUX_PINCM44);  /* PB18 -> ADC1 CH5 (CCD1/J3) */
-    DL_GPIO_initPeripheralAnalogFunction(IOMUX_PINCM43);  /* PB17 -> ADC1 CH4 (CCD2/J17) */
-
-    /* 2. Reset and power up ADC1 (SDK standard sequence) */
-    DL_ADC12_reset(ADC1);
-    DL_ADC12_enablePower(ADC1);
-    delay_cycles(POWER_STARTUP_DELAY);
-
-    /* 3. Configure ADC clock */
-    DL_ADC12_setClockConfig(ADC1,
-        (DL_ADC12_ClockConfig *) &gCcdAdcClockConfig);
-
-    /* 4. Init sequence-sample mode: MEM0→MEM1 per trigger, stop after one pass.
-     *    Sequence mode ensures both CH5 (CCD1) and CH4 (CCD2) are converted
-     *    on each software trigger, so ccd_adc_read_mem() can read either memory. */
-    DL_ADC12_initSeqSample(ADC1,
-        DL_ADC12_REPEAT_MODE_DISABLED,
-        DL_ADC12_SAMPLING_SOURCE_MANUAL,
-        DL_ADC12_TRIG_SRC_SOFTWARE,
-        DL_ADC12_MEM_IDX_0,  /* startAdd: first conversion memory */
-        DL_ADC12_MEM_IDX_1,  /* endAdd:   last conversion memory */
-        DL_ADC12_SAMP_CONV_RES_12_BIT,
-        DL_ADC12_SAMP_CONV_DATA_FORMAT_UNSIGNED);
-
-    /* 5. Configure conversion memories:
-     *    MEM0 = CCD1 (CH5/PB18), MEM1 = CCD2 (CH4/PB17)
-     *    VREF = VDDA (3.3V), sample timer = SCOMP0, no averaging */
-    DL_ADC12_configConversionMem(ADC1, DL_ADC12_MEM_IDX_0,
-        DL_ADC12_INPUT_CHAN_5,
-        DL_ADC12_REFERENCE_VOLTAGE_VDDA_VSSA,
-        DL_ADC12_SAMPLE_TIMER_SOURCE_SCOMP0,
-        DL_ADC12_AVERAGING_MODE_DISABLED,
-        DL_ADC12_BURN_OUT_SOURCE_DISABLED,
-        DL_ADC12_TRIGGER_MODE_AUTO_NEXT,
-        DL_ADC12_WINDOWS_COMP_MODE_DISABLED);
-
-    DL_ADC12_configConversionMem(ADC1, DL_ADC12_MEM_IDX_1,
-        DL_ADC12_INPUT_CHAN_4,
-        DL_ADC12_REFERENCE_VOLTAGE_VDDA_VSSA,
-        DL_ADC12_SAMPLE_TIMER_SOURCE_SCOMP0,
-        DL_ADC12_AVERAGING_MODE_DISABLED,
-        DL_ADC12_BURN_OUT_SOURCE_DISABLED,
-        DL_ADC12_TRIGGER_MODE_AUTO_NEXT,
-        DL_ADC12_WINDOWS_COMP_MODE_DISABLED);
-
-    /* 6. Set sample time0 (SCOMP0). ~100 ticks for stable CCD analog read. */
-    DL_ADC12_setSampleTime0(ADC1, 100);
-
-    /* 7. Enable conversions */
-    DL_ADC12_enableConversions(ADC1);
-}
-
 /* ─── Internal: read one ADC conversion memory (software trigger, blocking) ───
- * In sequence mode (MEM0→MEM1), startConversion() triggers a full pass through
- * both conversion memories. After BUSY clears, both MEM0 (CH5) and MEM1 (CH4)
- * hold fresh results. We simply read the requested memory — the other channel's
- * result is discarded (wasted conversion ~2us, acceptable for CCD debugging). */
+ * Sequence mode (MEM0→MEM1): each startConversion() converts both channels.
+ * We read the requested memory; the other channel's result is discarded. */
 
 #define CCD_ADC_TIMEOUT  10000U
 
@@ -88,46 +26,51 @@ static uint16_t ccd_adc_read_mem(DL_ADC12_MEM_IDX mem_idx)
 {
     volatile uint32_t timeout = CCD_ADC_TIMEOUT;
 
-    /* Start software-triggered sequence conversion (MEM0 then MEM1) */
-    DL_ADC12_startConversion(ADC1);
+    /* Re-arm ENC bit — hardware auto-clears it after each non-repeat sequence */
+    DL_ADC12_enableConversions(CCD_ADC_INST);
+    DL_ADC12_startConversion(CCD_ADC_INST);
 
-    /* Wait for sequence complete (poll BUSY flag with timeout) */
-    while (DL_ADC12_getStatus(ADC1) & DL_ADC12_STATUS_CONVERSION_ACTIVE) {
+    while (DL_ADC12_getStatus(CCD_ADC_INST) & DL_ADC12_STATUS_CONVERSION_ACTIVE) {
         if (--timeout == 0) {
             return 0;
         }
     }
 
-    /* Read result from conversion memory */
-    return (uint16_t)DL_ADC12_getMemResult(ADC1, mem_idx);
+    return (uint16_t)DL_ADC12_getMemResult(CCD_ADC_INST, mem_idx);
 }
 
 /* ─── Internal: CCD GPIO bit-bang helpers ─── */
 
 static void ccd_si_high(uint8_t ccd_id) {
-    if (ccd_id == CCD1) { CCD_SI1_HIGH; } else { CCD_SI2_HIGH; }
+    if (ccd_id <= CCD2) { CCD_SI1_HIGH; } else { CCD_SI2_HIGH; }
 }
 static void ccd_si_low(uint8_t ccd_id) {
-    if (ccd_id == CCD1) { CCD_SI1_LOW; } else { CCD_SI2_LOW; }
+    if (ccd_id <= CCD2) { CCD_SI1_LOW; } else { CCD_SI2_LOW; }
 }
 static void ccd_clk_high(uint8_t ccd_id) {
-    if (ccd_id == CCD1) { CCD_CLK1_HIGH; } else { CCD_CLK2_HIGH; }
+    if (ccd_id <= CCD2) { CCD_CLK1_HIGH; } else { CCD_CLK2_HIGH; }
 }
 static void ccd_clk_low(uint8_t ccd_id) {
-    if (ccd_id == CCD1) { CCD_CLK1_LOW; } else { CCD_CLK2_LOW; }
+    if (ccd_id <= CCD2) { CCD_CLK1_LOW; } else { CCD_CLK2_LOW; }
 }
 
-/* ADC memory index per CCD */
+/* ADC memory index per CCD channel */
 static DL_ADC12_MEM_IDX ccd_adc_mem_idx(uint8_t ccd_id)
 {
-    return (ccd_id == CCD1) ? DL_ADC12_MEM_IDX_0 : DL_ADC12_MEM_IDX_1;
+    switch (ccd_id) {
+    case CCD1: return DL_ADC12_MEM_IDX_0;  /* CH5, PB18 */
+    case CCD2: return DL_ADC12_MEM_IDX_1;  /* CH6, PB19 */
+    case CCD3: return DL_ADC12_MEM_IDX_2;  /* CH4, PB17 */
+    case CCD4: return DL_ADC12_MEM_IDX_3;  /* CH2, PA17 */
+    default:   return DL_ADC12_MEM_IDX_0;
+    }
 }
 
 /* ─── Public API ─── */
 
 void tsp_ccd_init(void)
 {
-    ccd_adc_init();
+    /* ADC0 is initialized by SYSCFG_DL_init() (SysConfig instance: CCD_ADC) */
 
     /* Initialize CCD control pins to idle state */
     CCD_SI1_LOW;
