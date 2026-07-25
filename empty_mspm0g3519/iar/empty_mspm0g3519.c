@@ -9,6 +9,7 @@
 #include "tsp_k230.h"
 #include "tsp_motor.h"
 #include "tsp_ccd.h"
+#include "tsp_mpu6050.h"
 
 /* ===== Global state ===== */
 extern volatile uint32_t sys_tick_counter;
@@ -507,12 +508,139 @@ exit_ccd:
 	tsp_menu_request_redraw();
 }
 
+/* ===== MPU6050 IMU Test (6-axis raw data + Yaw angle) ===== */
+
+static void action_mpu6050_test(void)
+{
+	mpu6050_raw_t  mpu;
+	uint8_t  page     = 0;   /* 0=raw data, 1=yaw */
+	uint8_t  redraw   = 1;
+	uint8_t  tick     = 0;
+	uint16_t i2c_err  = 0;
+	int8_t   init_ok;
+
+	tsp_tft18_clear(BLACK);
+	tsp_tft18_show_str_color(0, 0, (uint8_t *)"MPU6050 Test", YELLOW, BLUE);
+	tsp_tft18_draw_line_h(0, 16, 160, BLUE);
+
+	/* Init MPU6050 */
+	tsp_tft18_show_str_color(0, 2, (uint8_t *)"Init MPU6050...", CYAN, BLACK);
+	tsp_tft18_show_str_color(0, 3, (uint8_t *)"Keep board still!", YELLOW, BLACK);
+	init_ok = tsp_mpu6050_init();
+
+	if (init_ok != 0) {
+		uint8_t id = tsp_mpu6050_who_am_i();
+		tsp_tft18_show_str_color(0, 3, (uint8_t *)"FAIL! WHO_AM_I:", RED, BLACK);
+		tsp_tft18_show_uint16(0, 4, (uint16_t)id);
+		tsp_tft18_show_str_color(0, 6, (uint8_t *)"Check J16 cable", WHITE, BLACK);
+		tsp_tft18_show_str_color(0, 7, (uint8_t *)"PUSH to exit", GRAY1, BLACK);
+		while (1) {
+			tsp_key_scan();
+			if (tsp_key_pressed(KEY_PUSH)) goto exit_mpu;
+			delay_1ms(10);
+		}
+	}
+
+	tsp_tft18_show_str_color(0, 2, (uint8_t *)"WHO_AM_I: 0x68 OK  ", GREEN, BLACK);
+	tsp_tft18_show_str_color(0, 3, (uint8_t *)"GZ offset:", WHITE, BLACK);
+	tsp_tft18_show_int16(80, 3, tsp_mpu6050_get_gz_offset());
+	delay_1ms(800);
+
+	tsp_tft18_show_str_color(0, 6, (uint8_t *)"S0:Yaw=0 S2:Page", GRAY1, BLACK);
+	tsp_tft18_show_str_color(0, 7, (uint8_t *)"PUSH:exit       ", GRAY1, BLACK);
+
+	tsp_mpu6050_reset_yaw();
+	tsp_mpu6050_yaw_enable();
+
+	while (1) {
+		tsp_key_scan();
+		if (tsp_key_pressed(KEY_PUSH)) goto exit_mpu;
+
+		if (tsp_key_pressed(KEY_S0)) {
+			tsp_mpu6050_reset_yaw();
+			redraw = 1;
+		}
+		if (tsp_key_pressed(KEY_S2)) {
+			page = !page;
+			tsp_tft18_clear(BLACK);
+			tsp_tft18_show_str_color(0, 0, (uint8_t *)"MPU6050 Test", YELLOW, BLUE);
+			tsp_tft18_draw_line_h(0, 16, 160, BLUE);
+			tsp_tft18_show_str_color(0, 6, (uint8_t *)"S0:Yaw=0 S2:Page", GRAY1, BLACK);
+			tsp_tft18_show_str_color(0, 7, (uint8_t *)"PUSH:exit       ", GRAY1, BLACK);
+			redraw = 1;
+		}
+
+		tsp_mpu6050_update_yaw();
+
+		tick++;
+		if (tick >= 10) {
+			tick = 0;
+			redraw = 1;
+		}
+
+		if (redraw) {
+			if (tsp_mpu6050_read_raw(&mpu) == 0) {
+				if (page == 0) {
+
+					tsp_tft18_show_str_color(0, 2, (uint8_t *)"AX:", CYAN, BLACK);
+					tsp_tft18_show_int16(24, 2, mpu.ax);
+					tsp_tft18_show_str_color(80, 2, (uint8_t *)"AY:", CYAN, BLACK);
+					tsp_tft18_show_int16(104, 2, mpu.ay);
+
+					tsp_tft18_show_str_color(0, 3, (uint8_t *)"AZ:", CYAN, BLACK);
+					tsp_tft18_show_int16(24, 3, mpu.az);
+					tsp_tft18_show_str_color(80, 3, (uint8_t *)"T :", CYAN, BLACK);
+					tsp_tft18_show_int16(104, 3, mpu.temp);
+
+					tsp_tft18_show_str_color(0, 4, (uint8_t *)"GX:", GREEN, BLACK);
+					tsp_tft18_show_int16(24, 4, mpu.gx);
+					tsp_tft18_show_str_color(80, 4, (uint8_t *)"GY:", GREEN, BLACK);
+					tsp_tft18_show_int16(104, 4, mpu.gy);
+
+					tsp_tft18_show_str_color(0, 5, (uint8_t *)"GZ:", GREEN, BLACK);
+					tsp_tft18_show_int16(24, 5, mpu.gz);
+				} else {
+					/* Yaw page */
+					float yaw = tsp_mpu6050_get_yaw();
+					int16_t yaw_i = (int16_t)yaw;
+
+					tsp_tft18_show_str_color(0, 1, (uint8_t *)"[Yaw Heading]   ", WHITE, BLACK);
+
+					tsp_tft18_show_str_color(0, 2, (uint8_t *)"Yaw:", CYAN, BLACK);
+					tsp_tft18_show_int16(32, 2, yaw_i);
+					tsp_tft18_show_str_color(80, 2, (uint8_t *)"deg ", CYAN, BLACK);
+
+					tsp_tft18_show_str_color(0, 3, (uint8_t *)"GZ:", GREEN, BLACK);
+					tsp_tft18_show_int16(24, 3, mpu.gz);
+
+					tsp_tft18_show_str_color(0, 4, (uint8_t *)"Ofs:", GRAY1, BLACK);
+					tsp_tft18_show_int16(32, 4, tsp_mpu6050_get_gz_offset());
+
+					tsp_tft18_show_str_color(0, 5, (uint8_t *)"S0 to reset Yaw ", YELLOW, BLACK);
+				}
+			} else {
+				i2c_err++;
+				tsp_tft18_show_str_color(120, 0, (uint8_t *)"E", RED, BLUE);
+				tsp_tft18_show_uint16(128, 0, i2c_err);
+			}
+			redraw = 0;
+		}
+
+		delay_1ms(10);
+	}
+
+exit_mpu:
+	tsp_mpu6050_yaw_disable();
+	tsp_menu_request_redraw();
+}
+
 /* ===== Main Menu ===== */
 
 static tsp_menu_item_t main_menu[] = {
 	{"K230 Test",      action_k230_test},
 	{"CCD Test",       action_ccd_test},
 	{"Motor Test",     action_motor_test},
+	{"MPU6050 Test",   action_mpu6050_test},
 };
 
 #define MAIN_MENU_COUNT  (sizeof(main_menu) / sizeof(main_menu[0]))

@@ -21,7 +21,7 @@ MSPM0G3519 控制题平台（NUEDC-2026 SAIS@SJTU），从 G3519 基础平台拆
 
 工程入口：`empty_mspm0g3519/iar/empty_mspm0g3519.c`。
 
-菜单项（3 项）：K230 Test、CCD Test、Motor Test。
+菜单项（4 项）：K230 Test、CCD Test、Motor Test、MPU6050 Test。
 
 ## 工程结构
 
@@ -46,7 +46,8 @@ G3519_control/
 │   │   ├── tsp_uart.h/.c                  ← UART0（MFCLK 4MHz, 115200-8N1, 环形缓冲 RX）
 │   │   ├── tsp_uart_k230.h/.c             ← UART6（K230, BUSCLK 80MHz, 115200, 环形缓冲 RX）
 │   │   ├── tsp_k230.h/.c                  ← K230 YbProtocol 解析（主循环状态机, $...# 断帧）
-│   │   └── tsp_motor.h/.c                 ← DRV8874 直流电机驱动（TIMA0 PWM, 20kHz, M1/M2独立控制）
+│   │   ├── tsp_motor.h/.c                 ← DRV8874 直流电机驱动（TIMA0 PWM, 20kHz, M1/M2独立控制）
+│   │   └── tsp_mpu6050.h/.c               ← MPU6050 六轴 IMU（I2C0 轮询, Yaw 积分）
 │   ├── docs/                              ← 硬件文档与项目进度
 │   │   ├── development_reference/         ← 开发参考（硬件手册、驱动使用说明）
 │   │   ├── project_schedule/              ← 项目进度（控制题模块进度表）
@@ -82,7 +83,7 @@ G3519_control/
 | 电源控制 | PB1(SLEEP), PA7(FAULT) | `SLEEP_HIGH/LOW`, `FAULT()` |
 | UART6 (K230) | PC11(TX), PC10(RX)，J11 排座 | `UART_K230_INST`（SysConfig 宏） |
 | UART0 | PA10(TX), PA11(RX) | IOMUX_PINCM21/22 |
-| MPU6050 (I2C0) | PB21(SCL), PB22(SDA), PC8(INT) | 六轴 IMU，2.2kΩ 上拉，驱动待开发 |
+| MPU6050 (I2C0) | PB21(SCL), PB22(SDA), PC8(INT) | `IMU_I2C_INST`（SysConfig 宏） |
 
 ## SysConfig 模块列表
 
@@ -100,12 +101,10 @@ G3519_control/
 | UART1 | UART_0 | 调试串口（MFCLK 4MHz, PA10/PA11） |
 | UART2 | UART_K230 | K230 视觉模块（BUSCLK 80MHz, 115200, PC10/PC11） |
 | ADC12 | CCD_ADC | CCD 模拟采样（ADC1, ULPCLK/8, 序列 MEM0-3→CH5/6/4/2） |
+| I2C | IMU_I2C | MPU6050 六轴 IMU（I2C0, 400kHz, PB21-SCL/PB22-SDA） |
 
 **手动初始化（不在 SysConfig 中）**：
 - **TIMA0**：电机 PWM（20kHz），在 `tsp_motor_init()` 中手动配置
-
-**待添加**：
-- **I2C0**：MPU6050 六轴 IMU（PB21-SCL, PB22-SDA），需在 SysConfig 中添加后开发驱动
 
 ## API 速查
 
@@ -199,6 +198,18 @@ tsp_motor_stop(MOTOR1);                      // 停止电机1 (coast)
 tsp_motor_stop_all();                        // 停止全部
 if (tsp_motor_fault()) { ... }               // 检测 nFAULT (LOW=故障)
 SLEEP_LOW();                                 // 禁用 H 桥
+
+// ===== MPU6050 六轴 IMU（tsp_mpu6050.c，I2C0 轮询，SysConfig IMU_I2C） =====
+// 硬件: I2C0 (PB21-SCL, PB22-SDA), 400kHz, AD0=GND(0x68), INT=PC8(未用)
+int8_t ok = tsp_mpu6050_init();              // 复位+配置寄存器，返回 0=成功 -1=WHO_AM_I 失败
+uint8_t id = tsp_mpu6050_who_am_i();         // 读 WHO_AM_I（应返回 0x68）
+mpu6050_raw_t mpu;
+tsp_mpu6050_read_raw(&mpu);                  // 14B 突发读：mpu.ax/ay/az/temp/gx/gy/gz (int16_t)
+tsp_mpu6050_yaw_enable();                    // 启用 Yaw 积分
+tsp_mpu6050_update_yaw();                    // 主循环调用（自节拍 10ms，读 gyro Z 积分）
+float yaw = tsp_mpu6050_get_yaw();           // 当前 Yaw 角度（°）
+tsp_mpu6050_reset_yaw();                     // 清零 Yaw
+tsp_mpu6050_yaw_disable();                   // 禁用 Yaw 积分
 ```
 
 ## IAR 关键路径

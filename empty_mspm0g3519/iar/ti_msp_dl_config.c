@@ -52,6 +52,7 @@ SYSCONFIG_WEAK void SYSCFG_DL_init(void)
     SYSCFG_DL_GPIO_init();
     /* Module-Specific Initializations*/
     SYSCFG_DL_SYSCTL_init();
+    SYSCFG_DL_IMU_I2C_init();
     SYSCFG_DL_UART_0_init();
     SYSCFG_DL_UART_K230_init();
     SYSCFG_DL_LCD_init();
@@ -90,6 +91,7 @@ SYSCONFIG_WEAK void SYSCFG_DL_initPower(void)
     DL_GPIO_reset(GPIOA);
     DL_GPIO_reset(GPIOB);
     DL_GPIO_reset(GPIOC);
+    DL_I2C_reset(IMU_I2C_INST);
     DL_UART_Main_reset(UART_0_INST);
     DL_UART_Main_reset(UART_K230_INST);
     DL_SPI_reset(LCD_INST);
@@ -99,6 +101,7 @@ SYSCONFIG_WEAK void SYSCFG_DL_initPower(void)
     DL_GPIO_enablePower(GPIOA);
     DL_GPIO_enablePower(GPIOB);
     DL_GPIO_enablePower(GPIOC);
+    DL_I2C_enablePower(IMU_I2C_INST);
     DL_UART_Main_enablePower(UART_0_INST);
     DL_UART_Main_enablePower(UART_K230_INST);
     DL_SPI_enablePower(LCD_INST);
@@ -114,6 +117,17 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
     DL_GPIO_initPeripheralAnalogFunction(GPIO_HFXOUT_IOMUX);
     DL_GPIO_initPeripheralAnalogFunction(GPIO_LFXIN_IOMUX);
     DL_GPIO_initPeripheralAnalogFunction(GPIO_LFXOUT_IOMUX);
+
+    DL_GPIO_initPeripheralInputFunctionFeatures(GPIO_IMU_I2C_IOMUX_SDA,
+        GPIO_IMU_I2C_IOMUX_SDA_FUNC, DL_GPIO_INVERSION_DISABLE,
+        DL_GPIO_RESISTOR_NONE, DL_GPIO_HYSTERESIS_DISABLE,
+        DL_GPIO_WAKEUP_DISABLE);
+    DL_GPIO_initPeripheralInputFunctionFeatures(GPIO_IMU_I2C_IOMUX_SCL,
+        GPIO_IMU_I2C_IOMUX_SCL_FUNC, DL_GPIO_INVERSION_DISABLE,
+        DL_GPIO_RESISTOR_NONE, DL_GPIO_HYSTERESIS_DISABLE,
+        DL_GPIO_WAKEUP_DISABLE);
+    DL_GPIO_enableHiZ(GPIO_IMU_I2C_IOMUX_SDA);
+    DL_GPIO_enableHiZ(GPIO_IMU_I2C_IOMUX_SCL);
 
     DL_GPIO_initPeripheralOutputFunction(
         GPIO_UART_0_IOMUX_TX, GPIO_UART_0_IOMUX_TX_FUNC);
@@ -332,6 +346,32 @@ SYSCONFIG_WEAK void SYSCFG_DL_SYSCTL_init(void)
 
 }
 
+
+static const DL_I2C_ClockConfig gIMU_I2CClockConfig = {
+    .clockSel = DL_I2C_CLOCK_BUSCLK,
+    .divideRatio = DL_I2C_CLOCK_DIVIDE_1,
+};
+
+SYSCONFIG_WEAK void SYSCFG_DL_IMU_I2C_init(void) {
+
+    DL_I2C_setClockConfig(IMU_I2C_INST,
+        (DL_I2C_ClockConfig *) &gIMU_I2CClockConfig);
+    DL_I2C_disableAnalogGlitchFilter(IMU_I2C_INST);
+
+    /* Configure Controller Mode */
+    DL_I2C_resetControllerTransfer(IMU_I2C_INST);
+    /* Set frequency to 400000 Hz*/
+    DL_I2C_setTimerPeriod(IMU_I2C_INST, 9);
+    DL_I2C_setControllerTXFIFOThreshold(IMU_I2C_INST, DL_I2C_TX_FIFO_LEVEL_EMPTY);
+    DL_I2C_setControllerRXFIFOThreshold(IMU_I2C_INST, DL_I2C_RX_FIFO_LEVEL_BYTES_1);
+    DL_I2C_enableControllerClockStretching(IMU_I2C_INST);
+
+
+    /* Enable module */
+    DL_I2C_enableController(IMU_I2C_INST);
+
+
+}
 
 static const DL_UART_Main_ClockConfig gUART_0ClockConfig = {
     .clockSel    = DL_UART_MAIN_CLOCK_MFCLK,

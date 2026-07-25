@@ -94,6 +94,22 @@ extern "C" {
 bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 
 
+
+/* Defines for IMU_I2C */
+#define IMU_I2C_INST                                                        I2C0
+#define IMU_I2C_INST_IRQHandler                                  I2C0_IRQHandler
+#define IMU_I2C_INST_INT_IRQN                                      I2C0_INT_IRQn
+#define IMU_I2C_BUS_SPEED_HZ                                              400000
+#define GPIO_IMU_I2C_SDA_PORT                                              GPIOB
+#define GPIO_IMU_I2C_SDA_PIN                                      DL_GPIO_PIN_22
+#define GPIO_IMU_I2C_IOMUX_SDA                                   (IOMUX_PINCM50)
+#define GPIO_IMU_I2C_IOMUX_SDA_FUNC                    IOMUX_PINCM50_PF_I2C0_SDA
+#define GPIO_IMU_I2C_SCL_PORT                                              GPIOB
+#define GPIO_IMU_I2C_SCL_PIN                                      DL_GPIO_PIN_21
+#define GPIO_IMU_I2C_IOMUX_SCL                                   (IOMUX_PINCM49)
+#define GPIO_IMU_I2C_IOMUX_SCL_FUNC                    IOMUX_PINCM49_PF_I2C0_SCL
+
+
 /* Defines for UART_0 */
 #define UART_0_INST                                                        UART0
 #define UART_0_INST_FREQUENCY                                            4000000
@@ -266,6 +282,7 @@ void SYSCFG_DL_GPIO_init(void);
 void SYSCFG_DL_SYSCTL_init(void);
 
 bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
+void SYSCFG_DL_IMU_I2C_init(void);
 void SYSCFG_DL_UART_0_init(void);
 void SYSCFG_DL_UART_K230_init(void);
 void SYSCFG_DL_LCD_init(void);

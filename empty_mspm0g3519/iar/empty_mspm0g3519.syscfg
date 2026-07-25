@@ -16,6 +16,8 @@ const GPIO          = scripting.addModule("/ti/driverlib/GPIO", {}, false);
 const GPIO1         = GPIO.addInstance();
 const GPIO2         = GPIO.addInstance();
 const GPIO3         = GPIO.addInstance();
+const I2C           = scripting.addModule("/ti/driverlib/I2C", {}, false);
+const I2C1          = I2C.addInstance();
 const SPI           = scripting.addModule("/ti/driverlib/SPI", {}, false);
 const SPI1          = SPI.addInstance();
 const UART          = scripting.addModule("/ti/driverlib/UART", {}, false);
@@ -77,6 +79,16 @@ ADC121.adcPin6Config.$name   = "CCD2_AO";
 ADC121.adcPin4Config.$name   = "CCD3_AO";
 ADC121.adcPin2Config.$name   = "CCD4_AO";
 ADC121.peripheral.$assign    = "ADC1";
+
+I2C1.$name                        = "IMU_I2C";
+I2C1.basicEnableController        = true;
+I2C1.basicControllerBusSpeed      = 400000;
+I2C1.advAnalogGlitchFilter        = "DISABLED";
+I2C1.sdaPinConfig.$name           = "IMU_SDA";
+I2C1.sclPinConfig.$name           = "IMU_SCL";
+I2C1.peripheral.$assign           = "I2C0";
+I2C1.peripheral.sdaPin.$assign    = "PB22";
+I2C1.peripheral.sclPin.$assign    = "PB21";
 
 GPIO1.port                           = "PORTB";
 GPIO1.$name                          = "PORTB";
