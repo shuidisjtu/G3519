@@ -17,11 +17,7 @@
 
 ## 项目概述
 
-MSPM0G3519 **信号题**专用平台（NUEDC-2026 SAIS@SJTU），从 G3519 综合平台拆分。主控 TI `MSPM0G3519SPZR`（Cortex-M0+, 80MHz），IAR EWARM 9.60.3 + DAPLink。
-
-信号题核心模块：**AD5933 阻抗分析仪** + **AD9833 DDS 波形发生器**。
-
-工程入口：`empty_mspm0g3519/iar/empty_mspm0g3519.c`。
+MSPM0G3519 信号题专用平台（NUEDC-2026），详见 `README.md`。工程入口：`empty_mspm0g3519/iar/empty_mspm0g3519.c`。
 
 ## 工程结构
 

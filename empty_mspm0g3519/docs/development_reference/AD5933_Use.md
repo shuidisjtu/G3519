@@ -96,7 +96,7 @@ VIN  ←──│ U6A(跨阻) ←── J15-4            │←── 待测阻�
 ```
 ┌──────────────────────┐
 │AD5933 Impedance      │ ← Row 0
-│C: B0 08              │ ← Row 1 (CTRL 回读)
+│C: B3 08              │ ← Row 1 (CTRL 回读)
 │                      │ ← Row 2
 │Cal: 220 Ohm          │ ← Row 3, CYAN (校准电阻值)
 │Connect Rcal to J15   │ ← Row 4
@@ -115,7 +115,7 @@ VIN  ←──│ U6A(跨阻) ←── J15-4            │←── 待测阻�
 ```
 ┌──────────────────────┐
 │AD5933 Impedance      │ ← Row 0, YELLOW/BLUE
-│C: B0 08              │ ← Row 1, WHITE
+│C: B3 08              │ ← Row 1, WHITE
 │cM:12345 M:12345      │ ← Row 2, CYAN (校准 Mag / 当前 Mag)
 │Freq: 1000 Hz         │ ← Row 3, WHITE
 │Real: -16857          │ ← Row 4, WHITE (每次刷新)
@@ -130,7 +130,7 @@ VIN  ←──│ U6A(跨阻) ←── J15-4            │←── 待测阻�
 **自动流程**：
 1. `tsp_ad5933_init()` — 复位 + 外部时钟 + 待机
 2. 回读 CTRL_H/CTRL_L 并显示
-3. `tsp_ad5933_read_temperature()` — 测温
+3. ~~`tsp_ad5933_read_temperature()`~~ — 已从当前测试流程中移除
 4. 等待 S2 — 用户接入校准电阻
 5. `set_sweep(1000, 0, 0, 100, X1)` + `start_sweep()` — 标定测量
 6. 等待 `DATA_VALID` — 读 Real/Imag — 计算 `GainFactor = 1 / (R_cal × Mag_cal)`
@@ -250,7 +250,7 @@ Delta_Freq_Code  = (f_delta  × 2^29) / MCLK
 | 掉电 | `AD5933_CTRL_POWER_DOWN (0xA000)` | 低功耗模式 |
 | 待机 | `AD5933_CTRL_STANDBY (0xB000)` | 待机模式 |
 
-> **宏的位宽度**：以上宏均为 16 位值（与电压/PGA 宏一致）。写入 CTRL_H 寄存器（8 位）时统一使用 `>> 8`：`(uint8_t)((AD5933_CTRL_STANDBY >> 8) | AD5933_VOLT_2000MV | AD5933_PGA_X1)`。
+> **宏的位宽度**：以上宏均为 16 位值（与电压/PGA 宏一致）。写入 CTRL_H 寄存器（8 位）时统一使用 `>> 8`：`(uint8_t)((AD5933_CTRL_STANDBY >> 8) | AD5933_VOLT_200MV | AD5933_PGA_X1)`。
 
 ### 4.3 状态寄存器位 (0x8F)
 
@@ -273,7 +273,7 @@ void    tsp_ad5933_write_block(uint8_t reg_addr, uint8_t *data, uint8_t len);  /
 uint8_t tsp_ad5933_read_status(void);                // 读状态寄存器
 float   tsp_ad5933_read_temperature(void);            // 返回摄氏度
 
-// ===== 扫频（API 已就绪，待联调）=====
+// ===== 扫频（已验证）=====
 void    tsp_ad5933_set_sweep(uint32_t start_hz,      // 起始频率 Hz
                              uint32_t delta_hz,      // 频率步进 Hz
                              uint16_t num_increments, // 增量数（总点数 = num_increments + 1）
@@ -305,8 +305,8 @@ float temp = signed_code / 32.0f;
 // 1. 初始化 AD5933（复位 + 外部时钟 + 待机）
 tsp_ad5933_init();
 
-// 2. 读温度（验证 I2C 通信和芯片响应）
-float temp = tsp_ad5933_read_temperature();
+// 2. （可选）读温度验证 I2C 通信——当前测试界面已移除此步骤
+// float temp = tsp_ad5933_read_temperature();
 
 // 3. 配置扫频参数（100 个频点 → 写入 99 个增量）
 tsp_ad5933_set_sweep(
@@ -333,7 +333,7 @@ for (uint16_t i = 0; i <= num_increments; i++) {
     // 递增到下一频点（最后一个频点后不递增）
     if (i < num_increments) {
         tsp_ad5933_write_reg(AD5933_REG_CTRL_H,
-            (uint8_t)((AD5933_CTRL_INCREMENT_FREQ >> 8) | AD5933_VOLT_2000MV | AD5933_PGA_X1));
+            (uint8_t)((AD5933_CTRL_INCREMENT_FREQ >> 8) | AD5933_VOLT_200MV | AD5933_PGA_X1));
     }
 }
 
@@ -393,38 +393,7 @@ I2C1.peripheral.sclPin.$assign = "PA29";
 
 ---
 
-## 8. 已修复 Bug
+## 8. 设计教训
 
-### 8.1 read_temperature() 命令截断（2026-07-22）
-
-**现象**：温度始终显示 `--.-C (no resp)`，500ms 后超时。
-
-**根因**：`tsp_ad5933_read_temperature()` 中将 16-bit 宏 `AD5933_CTRL_MEASURE_TEMP (0x9000)` 直接传给 `tsp_ad5933_write_reg(reg, uint8_t data)`，被截断为 `0x00`（NOP 命令）。温度测量从未启动，TEMP_VALID 位始终为 0。
-
-**修复**：与其他 CTRL_H 写入一致，使用 `>> 8` 提取高字节，同时保持外部时钟位：
-```c
-// 修复前
-tsp_ad5933_write_reg(AD5933_REG_CTRL_H, AD5933_CTRL_MEASURE_TEMP);  // → 0x00 (NOP!)
-tsp_ad5933_write_reg(AD5933_REG_CTRL_L, 0x00);                       // → 丢失外部时钟
-
-// 修复后
-tsp_ad5933_write_reg(AD5933_REG_CTRL_H,
-    (uint8_t)(AD5933_CTRL_MEASURE_TEMP >> 8));                       // → 0x90 (正确)
-tsp_ad5933_write_reg(AD5933_REG_CTRL_L, AD5933_CLK_EXTERNAL);        // → 0x08 (保持外部时钟)
-```
-
-### 8.2 read_temperature() 轮询无超时（2026-07-22）
-
-**现象**：进入 AD5933 Test 后 LCD 仅显示 Row 0/1，Row 2+ 无显示，PUSH 键无法退出，系统完全卡死。
-
-**根因**：温度转换的 `while (!TEMP_VALID)` 轮询循环无超时保护。AD5933 未完成测量时，代码永远阻塞在 `read_temperature()` 内，无法到达 live loop（包含按键扫描）。
-
-**修复**：添加 500ms 超时（datasheet 典型值 ~30ms），超时返回 `NAN`；调用侧检测 NaN 后显示 `T: --.-C (no resp)`（黄色），然后**继续进入 live loop**，保证 PUSH 键始终可退出。
-
-### 8.3 温度不自动更新（2026-07-22）
-
-**现象**：手指按压 AD5933 后温度显示不变，退出再进入菜单才看到新值。
-
-**根因**：温度仅在前导初始化阶段读取一次，live loop 中只刷新 Real/Imag/Mag，温度从不更新。
-
-**修复**：live loop 内添加温度定时刷新（每 20 次迭代 = ~1s），仅在值变化时写 LCD 避免闪烁。
+1. **16-bit 宏写入 8-bit 寄存器必须 >> 8**：AD5933 控制宏（如 `AD5933_CTRL_MEASURE_TEMP = 0x9000`）为 16 位值，写入 CTRL_H（8 位寄存器）时若不右移 8 位，高字节被截断为 0x00（NOP），导致命令无效。
+2. **所有硬件轮询必须带超时**：`while (!STATUS_BIT)` 无超时保护会导致系统永久卡死，且无法通过按键退出。所有硬件等待循环必须设置合理超时（如温度转换 500ms）并在超时后安全降级。

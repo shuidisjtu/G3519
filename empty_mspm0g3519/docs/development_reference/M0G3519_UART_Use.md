@@ -1,7 +1,7 @@
 # MSPM0G3519 学校开发板 UART 使用说明
 
 版本：V2.0（合并已验证配置与调试清单）  
-适用对象：以 MSPM0G3519SPZR 为核心的学校开发主板，以及配套 `Car_2Motor` 拓展板
+适用对象：MSPM0G3519 开发板
 
 ## 1. 结论速览
 
@@ -215,7 +215,7 @@ RX 中断触发
 
 > ⚠️ **已修复（2026-07-25）**：UART0 脱机阻塞问题已通过 TX 10ms 超时保护解决。`tsp_uart.c` 中所有 `DL_UART_transmitDataBlocking()` 已替换为带超时的 `uart_tx_byte()`（包括 `__write()` printf 重定向）。脱机时 TX 静默失败，MCU 不卡死。UART0 已恢复到 `main()` 初始化序列中。
 
-UART6（K230 视觉模块通道，2026-07-17 实测验证，详见 `K230_Vision_Module_Use.md`）：
+UART6（K230 视觉模块通道，2026-07-17 实测验证，详见 `K230_Vision_Module_Use.md`）[信号题未使用 K230]：
 
 | 项目 | 配置 |
 |------|------|
