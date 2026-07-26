@@ -4,9 +4,9 @@
  *
  * Ported from HSP Odometer.c (GD32F4xx). Adapted for MSPM0G3519.
  *
- * Uses tsp_encoder driver (PHA0/PHB0 quadrature decode via EXTI interrupt).
- * Encoder speed is updated every 20ms by tsp_encoder_update_speed() from
- * SysTick_Handler. Pulse count is read atomically via tsp_encoder_get_count().
+ * Uses tsp_wheel_enc driver (TIMG8/TIMG9 hardware QEI, dual-wheel).
+ * Encoder speed is updated every 20ms by tsp_wheel_enc_update() from
+ * SysTick_Handler. Pulse count is read via tsp_wheel_enc_count().
  *
  * Display: incremental refresh — only redraw fields that changed.
  *
@@ -16,7 +16,6 @@
  */
 
 #include "tsp_odometer.h"
-#include "tsp_encoder.h"
 #include "tsp_wheel_enc.h"
 #include "tsp_key.h"
 #include "tsp_gpio.h"
@@ -77,7 +76,7 @@ void tsp_odometer_demo(void)
 {
     odometer_mode_t mode = ODOM_MODE_STRAIGHT;
 
-    /* Encoder accumulator (independent of tsp_encoder's internal count) */
+    /* Encoder accumulator */
     int32_t  pulse_total  = 0;
     int32_t  last_count   = 0;
     uint8_t  first_read   = 1;    /* skip first read (anchoring) */
@@ -109,7 +108,7 @@ void tsp_odometer_demo(void)
     while (1)
     {
         /*
-         * Read encoder (atomic on M0+ via PRIMASK in tsp_encoder_get_count)
+         * Read wheel encoder (volatile read, atomic on M0+ for aligned 32-bit)
          */
         int32_t cur_count = tsp_wheel_enc_count(MOTOR1);
 

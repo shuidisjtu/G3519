@@ -96,4 +96,4 @@ void tsp_motor_pwm_start(void);
  */
 void tsp_motor_pwm_stop(void);
 
-#endif /* _TSP_MOTOR_H */
+#endif /* TSP_MOTOR_H_ */

@@ -13,8 +13,8 @@
 | 旋钮编码器 | 完整 | 在用（菜单/参数微调） | 可用 |
 | 轮子编码器(QEI) | 完整（TIMG8/TIMG9 硬件QEI） | 已验证：双轮脉冲/速度正常 | 待标定 |
 | MPU6050 陀螺仪/IMU | 完整 | 已验证 | 可用 |
-| PID 控制器 | 完整 | 闭环菜单可用 | 增益待重调 |
-| CCD 循迹算法 | 完整 | 待实物验证 | 增益待重调 |
+| PID 控制器 | 完整 | 闭环菜单可用 | 可用（已重调增益） |
+| CCD 循迹算法 | 完整 | 待实物验证 | 增益待重调（反馈量级变化） |
 | 里程计 | 完整 | 轮子编码器已接入 | COUNTS_PER_CM 待标定 |
 
 ## 各模块详情
@@ -92,7 +92,6 @@
 - **待完成**：
   - `ODOM_COUNTS_PER_CM` 标定（推车 100cm 记录脉冲数）
   - `ODOM_COUNTS_PER_DEGREE` 标定
-  - ClsLoop PID 增益重调（反馈量级变化）
   - LineFollow PD 增益重调
 
 ### MPU6050 陀螺仪/IMU（盲走航向）
@@ -129,7 +128,7 @@
 | 电机驱动 | DRV8874 | ✓ 代码完整 |
 | 视觉导航/色块追踪 | K230 | ✓ 已验证 |
 | CCD 循迹 | CCD + 循迹算法 | ✓ 已实现（tsp_linefollow.c） |
-| 速度闭环 | 轮子编码器(QEI) + PID | ✓ 已实现（待增益重调） |
+| 速度闭环 | 轮子编码器(QEI) + PID | ✓ 已验证（增益已重调） |
 | 盲走/航向控制 | MPU6050 + Yaw 积分 | ✓ 已验证 |
 | 里程测量 | 轮子编码器(QEI) + 里程计 | ✓ 已实现（待标定 COUNTS_PER_CM） |
 | PID 参数调整 | 编码器旋钮 + LCD | ✓ 已实现（Speed Setting 菜单） |
@@ -185,3 +184,16 @@
 - 循迹 g_lost_frames uint8 回绕（MEDIUM）— 饱和递增
 - LCD draw_frame 右下角缺失（MEDIUM）— 使用 dx-1/dy-1 定位边框
 - 所有头文件 include guard 从保留标识符 `_X` 改为 `X_`
+
+## 代码质量审查记录（2026-07-26）
+
+双 PWM 迁移 + QEI 编码器集成后复审，共修复 4 文件 7 项问题：
+
+**关键修复**：
+- tsp_wheel_enc.c: g_speed/g_last_raw/g_last_tick/g_first_run 缺少 volatile（CRITICAL）— ISR 写入、主循环读取，优化器可能缓存过期值
+- tsp_wheel_enc.c: reset() 无临界区保护（HIGH）— SysTick 可能在复位中途触发 update()，导致 g_count 被脏 delta 污染
+- tsp_odometer.c: S2 复位仍调用旋钮 tsp_encoder_reset() 而非轮子 tsp_wheel_enc_reset()（HIGH）— 迁移遗漏
+- tsp_wheel_enc.c: 新增 g_running 守卫 — update() 在 QEI 计数器未启动时直接返回，防止垃圾累积
+- tsp_motor.h: 文件头从旧 GPIO+PWM 描述更新为当前双 PWM 4 通道架构
+- empty_mspm0g3519.c: Motor ClsLoop PID 增益重调（Kp 0.2→0.05, Ki 0.02→0.008, Kd 0.06→0.02），目标速度范围适配 QEI 反馈量级
+- 所有修复已通过完整 8 步硬件调试流程验证

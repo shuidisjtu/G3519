@@ -158,7 +158,7 @@ uint8_t back = tsp_menu_run();         // 主循环调用
 tsp_menu_switch(title, items, count);  // 切换子菜单
 
 // ===== 旋钮编码器（tsp_encoder.c，PA14/PA15 GPIO 中断正交解码） =====
-// 用于菜单参数微调（Motor OpenLoop 切 M1/M2、ClsLoop 目标速度±1）
+// 用于菜单参数微调（Motor OpenLoop 切 M1/M2、ClsLoop 目标速度±10）
 tsp_encoder_enable();                  // 启用 PHA0 中断 + 复位计数（进入编码器场景时调用）
 tsp_encoder_disable();                 // 禁用 PHA0 中断 + 复位（退出时调用，防浮空中断）
 int32_t cnt = tsp_encoder_get_count(); // 原子读取

@@ -1,11 +1,11 @@
 /**
  * @file    tsp_odometer.h
- * @brief   Odometer — Distance & Angle measurement via encoder
+ * @brief   Odometer — Distance & Angle measurement via wheel encoder
  *
  * Ported from HSP (HuashanPi) smart car project Odometer.h.
- * Adapted for MSPM0G3519 with single encoder (PHA0/PHB0).
+ * Adapted for MSPM0G3519 with dual-wheel QEI encoder (TIMG8/TIMG9).
  *
- * Uses tsp_encoder driver for pulse counting.
+ * Uses tsp_wheel_enc driver for pulse counting (hardware quadrature decode).
  *
  * Modes:
  *   - ODOM_MODE_STRAIGHT: track linear distance (cm)
@@ -56,8 +56,8 @@ typedef enum {
 /**
  * @brief  Run odometer demo (blocking, own while(1) loop).
  *
- * Reads encoder counts from tsp_encoder, computes distance/angle,
- * displays on LCD with incremental refresh.
+ * Reads encoder counts from tsp_wheel_enc (right wheel QEI), computes
+ * distance/angle, displays on LCD with incremental refresh.
  *
  * Key controls (distributed across all buttons):
  *   S0: Switch to Straight mode (distance tracking)
