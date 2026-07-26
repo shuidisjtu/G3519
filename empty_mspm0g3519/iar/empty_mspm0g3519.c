@@ -11,6 +11,7 @@
 #include "tsp_uart.h"
 #include "tsp_cmd.h"
 #include "tsp_scope.h"
+#include "tsp_fft.h"
 #include <math.h>
 
 /* ===== Global state ===== */
@@ -137,7 +138,7 @@ static void action_dds_test(void)
 				buf[20] = '\0';
 				tsp_tft18_show_str_color(0, 2, (uint8_t *)buf, CYAN, BLACK);
 				tsp_tft18_show_str_color(0, 4, (uint8_t *)tsp_dds_vout_info[wave_idx],
-				                         WHITE, BLACK);
+										 WHITE, BLACK);
 				last_wave = wave_idx;
 			}
 
@@ -396,7 +397,7 @@ static void action_ad5933_test(void)
 		int16_t cal_real = tsp_ad5933_read_real();
 		int16_t cal_imag = tsp_ad5933_read_imag();
 		float cal_mag = sqrtf((float)cal_real * cal_real +
-		                      (float)cal_imag * cal_imag);
+							  (float)cal_imag * cal_imag);
 
 		if (cal_mag > 1.0f) {
 			gain_factor = 1.0f / (CAL_RESISTANCE * cal_mag);
@@ -626,7 +627,7 @@ static void action_scope_test(void)
 
 			{
 				uint16_t *raw = tsp_adc_burst_sample(SCOPE_SAMPLE_N,
-				                                     scope_tb_presets[tb_idx]);
+										             scope_tb_presets[tb_idx]);
 				uint16_t trig = 0;
 				uint16_t i;
 				uint16_t vmin = 4095, vmax = 0;
@@ -663,38 +664,47 @@ static void action_scope_test(void)
 
 #define SWEEP_POINTS  80
 
-static uint16_t sweep_measure_vpp(uint32_t freq_hz)
-{
-	uint16_t count, dly;
-	uint16_t *buf;
-	uint16_t vmin = 4095, vmax = 0;
-	uint16_t i;
-	uint32_t settle;
+typedef struct {
+	uint16_t vpp_mv;
+	int16_t  phase_deg10;
+} sweep_point_t;
 
-	/* Adaptive sample rate based on known DDS frequency */
+static sweep_point_t sweep_measure_point(uint32_t freq_hz)
+{
+	sweep_point_t pt;
+	uint16_t dly;
+	uint16_t *buf;
+	uint32_t settle;
+	uint32_t reg;
+	uint16_t lsb, msb;
+
 	if (freq_hz < 300) {
-		count = 512; dly = 200;
+		dly = 200;
 	} else if (freq_hz < 3000) {
-		count = 512; dly = 20;
-	} else if (freq_hz < 20000) {
-		count = 256; dly = 0;
+		dly = 20;
 	} else {
-		count = 64;  dly = 0;
+		dly = 0;
 	}
 
-	/* Wait 5 cycles for DUT settling (min 2ms) */
 	settle = 5000 / freq_hz;
 	if (settle < 2) settle = 2;
 	delay_1ms((uint16_t)settle);
 
-	buf = tsp_adc_burst_sample(count, dly);
+	reg = DDS_FREQ_REG(freq_hz);
+	lsb = AD9833_FREQ0 | ((uint16_t)(reg & 0x3FFF));
+	msb = AD9833_FREQ0 | ((uint16_t)((reg >> 14) & 0x3FFF));
 
-	for (i = 0; i < count; i++) {
-		if (buf[i] < vmin) vmin = buf[i];
-		if (buf[i] > vmax) vmax = buf[i];
-	}
+	__disable_irq();
+	tsp_dds_write(AD9833_RESET);
+	tsp_dds_write(lsb);
+	tsp_dds_write(msb);
+	tsp_dds_write(AD9833_SINE);
+	delay_cycles((uint32_t)3 * 80000000UL / freq_hz);
+	buf = tsp_adc_burst_sample(FFT_N, dly);
+	__enable_irq();
 
-	return (uint16_t)((uint32_t)(vmax - vmin) * ADC_VREF_MV / ADC_RESOLUTION);
+	pt.phase_deg10 = tsp_fft_extract_phase(buf, freq_hz, dly, &pt.vpp_mv);
+	return pt;
 }
 
 static uint16_t sweep_auto_ceiling(uint16_t vpp_max)
@@ -773,16 +783,91 @@ static void sweep_draw_plot(uint16_t *vpp_data, uint8_t count, uint16_t y_ceilin
 	}
 }
 
+static uint8_t sweep_map_y_phase(int16_t deg10)
+{
+	int32_t val = (int32_t)deg10 + 1800;
+	if (val < 0) val = 0;
+	if (val > 3600) val = 3600;
+	uint8_t h = (uint8_t)((uint32_t)val * (SCOPE_GRAPH_H - 1) / 3600);
+	return SCOPE_GRAPH_Y1 - h;
+}
+
+static void sweep_draw_phase_grid(uint32_t *freqs)
+{
+	uint16_t x;
+	uint8_t m, j, vy;
+	uint8_t y_p90 = sweep_map_y_phase(900);
+	uint8_t y_0   = sweep_map_y_phase(0);
+	uint8_t y_n90 = sweep_map_y_phase(-900);
+	static const uint32_t vmarks[] = {200, 500, 1000, 2000, 5000, 10000, 20000};
+
+	for (x = 0; x < SCOPE_WIDTH; x += 4) {
+		tsp_tft18_draw_pixel(x, y_p90, GRAY2);
+		tsp_tft18_draw_pixel(x, y_0,   GRAY2);
+		tsp_tft18_draw_pixel(x, y_n90, GRAY2);
+	}
+
+	tsp_tft18_show_char_color(0, y_0 - 4, '0', GRAY1, BLACK);
+
+	for (m = 0; m < sizeof(vmarks) / sizeof(vmarks[0]); m++) {
+		for (j = 0; j < SWEEP_POINTS - 1; j++) {
+			if (freqs[j] <= vmarks[m] && freqs[j + 1] > vmarks[m]) {
+				uint16_t vx = (uint16_t)j * 2;
+				for (vy = SCOPE_GRAPH_Y0; vy <= SCOPE_GRAPH_Y1; vy += 4) {
+					tsp_tft18_draw_pixel(vx, vy, GRAY2);
+				}
+				if (vmarks[m] == 1000) {
+					tsp_tft18_show_char_color(vx + 2, SCOPE_GRAPH_Y0, '1', GRAY1, BLACK);
+					tsp_tft18_show_char_color(vx + 10, SCOPE_GRAPH_Y0, 'k', GRAY1, BLACK);
+				} else if (vmarks[m] == 10000) {
+					tsp_tft18_show_char_color(vx + 2, SCOPE_GRAPH_Y0, '1', GRAY1, BLACK);
+					tsp_tft18_show_char_color(vx + 10, SCOPE_GRAPH_Y0, '0', GRAY1, BLACK);
+					tsp_tft18_show_char_color(vx + 18, SCOPE_GRAPH_Y0, 'k', GRAY1, BLACK);
+				}
+				break;
+			}
+		}
+	}
+}
+
+static void sweep_draw_phase_plot(int16_t *phase_data, uint8_t count)
+{
+	uint8_t i;
+	uint8_t y_prev, y_cur;
+
+	if (count == 0) return;
+
+	y_prev = sweep_map_y_phase(phase_data[0]);
+	tsp_tft18_draw_pixel(0, y_prev, YELLOW);
+	tsp_tft18_draw_pixel(1, y_prev, YELLOW);
+
+	for (i = 1; i < count; i++) {
+		uint16_t x = (uint16_t)i * 2;
+		y_cur = sweep_map_y_phase(phase_data[i]);
+		tsp_scope_vline(x,     y_prev, y_cur, YELLOW);
+		tsp_scope_vline(x + 1, y_prev, y_cur, YELLOW);
+		y_prev = y_cur;
+	}
+}
+
 static void action_sweep_test(void)
 {
 	uint8_t  ch_idx   = 0;
 	uint8_t  last_ch  = 0xFF;
-	uint32_t sweep_freqs[SWEEP_POINTS];
-	uint16_t sweep_vpp[SWEEP_POINTS];
-	uint8_t  has_data = 0;
 	uint8_t  i;
 
-	/* Generate log-spaced frequencies: 100Hz -> ~50kHz */
+	static uint32_t sweep_freqs[SWEEP_POINTS];
+	static uint16_t sweep_vpp[SWEEP_POINTS];
+	static uint16_t sweep_vpp_cal[SWEEP_POINTS];
+	static int16_t  sweep_phase_ref[SWEEP_POINTS];
+	static int16_t  sweep_phase_diff[SWEEP_POINTS];
+
+	uint8_t  has_cal  = 0;
+	uint8_t  has_data = 0;
+	uint8_t  view_phase = 0;
+	uint16_t vpp_max  = 0;
+	uint8_t  peak_idx = 0;
+
 	{
 		uint32_t f = 100;
 		for (i = 0; i < SWEEP_POINTS; i++) {
@@ -797,21 +882,21 @@ static void action_sweep_test(void)
 
 	tsp_tft18_clear(BLACK);
 	tsp_tft18_draw_line_h(0, 16, 160, BLUE);
-	tsp_tft18_show_str_color(0, 7, (uint8_t *)"S0/S1:CH S2:Run PU:X", GRAY1, BLACK);
+	tsp_tft18_show_str_color(0, 7, (uint8_t *)"S0/S1:CH S2:Cal PU:X", GRAY1, BLACK);
 
 	while (1) {
 		tsp_key_scan();
 		if (tsp_key_pressed(KEY_PUSH)) break;
 
-		/* Channel select */
-		if (tsp_key_pressed(KEY_S0)) {
-			ch_idx = (ch_idx == 0) ? ADC_CH_COUNT - 1 : ch_idx - 1;
-		}
-		if (tsp_key_pressed(KEY_S1)) {
-			ch_idx = (ch_idx + 1 >= ADC_CH_COUNT) ? 0 : ch_idx + 1;
+		if (!has_cal && !has_data) {
+			if (tsp_key_pressed(KEY_S0)) {
+				ch_idx = (ch_idx == 0) ? ADC_CH_COUNT - 1 : ch_idx - 1;
+			}
+			if (tsp_key_pressed(KEY_S1)) {
+				ch_idx = (ch_idx + 1 >= ADC_CH_COUNT) ? 0 : ch_idx + 1;
+			}
 		}
 
-		/* Update title on channel change */
 		if (ch_idx != last_ch) {
 			tsp_adc_select_channel(ch_idx);
 			{
@@ -831,80 +916,181 @@ static void action_sweep_test(void)
 			last_ch = ch_idx;
 		}
 
-		/* S2: start sweep */
 		if (tsp_key_pressed(KEY_S2)) {
-			uint16_t vpp_max = 0;
-			uint8_t  peak_idx = 0;
-			uint8_t  aborted = 0;
-
-			has_data = 0;
-			tsp_scope_clear();
-
-			for (i = 0; i < SWEEP_POINTS; i++) {
-				/* Check abort */
-				tsp_key_scan();
-				if (tsp_key_pressed(KEY_PUSH)) { aborted = 1; break; }
-
-				/* Progress indicator */
-				{
-					char buf[21];
-					uint8_t p = 0;
-					buf[p++] = 'S'; buf[p++] = 'w'; buf[p++] = 'e';
-					buf[p++] = 'e'; buf[p++] = 'p'; buf[p++] = 'i';
-					buf[p++] = 'n'; buf[p++] = 'g'; buf[p++] = '.';
-					buf[p++] = '.'; buf[p++] = '.'; buf[p++] = ' ';
-					fmt_uint16(buf, &p, (uint16_t)(i + 1), 2);
-					buf[p++] = '/';
-					fmt_uint16(buf, &p, SWEEP_POINTS, 2);
-					while (p < 20) buf[p++] = ' ';
-					buf[20] = '\0';
-					tsp_tft18_show_str_color(0, 7, (uint8_t *)buf, WHITE, BLACK);
-				}
-
-				/* DDS + measure */
-				tsp_dds_set_output(sweep_freqs[i], AD9833_SINE);
-				sweep_vpp[i] = sweep_measure_vpp(sweep_freqs[i]);
-
-				if (sweep_vpp[i] > vpp_max) {
-					vpp_max = sweep_vpp[i];
-					peak_idx = i;
-				}
-
-				/* Progressive dot */
-				{
-					uint8_t y = sweep_map_y(sweep_vpp[i], vpp_max);
-					tsp_tft18_draw_pixel(i * 2,     y, CYAN);
-					tsp_tft18_draw_pixel(i * 2 + 1, y, CYAN);
-				}
-			}
-
-			tsp_dds_stop();
-
-			if (!aborted) {
-				uint16_t y_ceiling = sweep_auto_ceiling(vpp_max);
-				has_data = 1;
-
+			if (!has_cal) {
+				/* === CAL phase: DDS->ADC direct === */
+				uint8_t aborted = 0;
 				tsp_scope_clear();
-				sweep_draw_grid(y_ceiling, sweep_freqs);
-				sweep_draw_plot(sweep_vpp, SWEEP_POINTS, y_ceiling);
-			}
 
-			tsp_tft18_show_str_color(0, 7, (uint8_t *)"S0/S1:CH S2:Run PU:X", GRAY1, BLACK);
+				for (i = 0; i < SWEEP_POINTS; i++) {
+					tsp_key_scan();
+					if (tsp_key_pressed(KEY_PUSH)) { aborted = 1; break; }
 
-			/* Show peak Vpp and frequency on row 6 */
-			if (has_data) {
-				char buf[21];
-				uint8_t p = 0;
-				buf[p++] = 'M'; buf[p++] = 'a'; buf[p++] = 'x';
-				buf[p++] = ':';
-				fmt_uint16(buf, &p, vpp_max, 4);
-				buf[p++] = 'm'; buf[p++] = 'V';
-				buf[p++] = ' '; buf[p++] = '@';
-				fmt_uint32(buf, &p, sweep_freqs[peak_idx], 5);
-				buf[p++] = 'H'; buf[p++] = 'z';
-				while (p < 20) buf[p++] = ' ';
-				buf[20] = '\0';
-				tsp_tft18_show_str_color(0, 6, (uint8_t *)buf, GREEN, BLACK);
+					{
+						char buf[21];
+						uint8_t p = 0;
+						buf[p++] = 'C'; buf[p++] = 'a'; buf[p++] = 'l';
+						buf[p++] = '.'; buf[p++] = '.'; buf[p++] = '.';
+						buf[p++] = ' ';
+						fmt_uint16(buf, &p, (uint16_t)(i + 1), 2);
+						buf[p++] = '/';
+						fmt_uint16(buf, &p, SWEEP_POINTS, 2);
+						while (p < 20) buf[p++] = ' ';
+						buf[20] = '\0';
+						tsp_tft18_show_str_color(0, 7, (uint8_t *)buf, WHITE, BLACK);
+					}
+
+					tsp_dds_set_output(sweep_freqs[i], AD9833_SINE);
+					{
+						sweep_point_t pt = sweep_measure_point(sweep_freqs[i]);
+						sweep_phase_ref[i] = pt.phase_deg10;
+						sweep_vpp_cal[i] = pt.vpp_mv;
+					}
+
+					{
+						uint8_t y = sweep_map_y_phase(sweep_phase_ref[i]);
+						tsp_tft18_draw_pixel(i * 2,     y, GRAY1);
+						tsp_tft18_draw_pixel(i * 2 + 1, y, GRAY1);
+					}
+				}
+
+				tsp_dds_stop();
+
+				if (!aborted) {
+					has_cal = 1;
+					tsp_scope_clear();
+					tsp_tft18_show_str_color(0, 6, (uint8_t *)"Cal OK              ", GREEN, BLACK);
+					tsp_tft18_show_str_color(0, 7, (uint8_t *)"DUT->ADC  S2:Meas   ", YELLOW, BLACK);
+				} else {
+					tsp_tft18_show_str_color(0, 7, (uint8_t *)"S0/S1:CH S2:Cal PU:X", GRAY1, BLACK);
+				}
+			} else if (has_cal && !has_data) {
+				/* === MEAS phase: DDS->DUT->ADC === */
+				uint8_t aborted = 0;
+				vpp_max = 0;
+				peak_idx = 0;
+				tsp_scope_clear();
+
+				for (i = 0; i < SWEEP_POINTS; i++) {
+					tsp_key_scan();
+					if (tsp_key_pressed(KEY_PUSH)) { aborted = 1; break; }
+
+					{
+						char buf[21];
+						uint8_t p = 0;
+						buf[p++] = 'M'; buf[p++] = 'e'; buf[p++] = 'a';
+						buf[p++] = 's'; buf[p++] = '.'; buf[p++] = '.';
+						buf[p++] = '.'; buf[p++] = ' ';
+						fmt_uint16(buf, &p, (uint16_t)(i + 1), 2);
+						buf[p++] = '/';
+						fmt_uint16(buf, &p, SWEEP_POINTS, 2);
+						while (p < 20) buf[p++] = ' ';
+						buf[20] = '\0';
+						tsp_tft18_show_str_color(0, 7, (uint8_t *)buf, WHITE, BLACK);
+					}
+
+					tsp_dds_set_output(sweep_freqs[i], AD9833_SINE);
+					{
+						sweep_point_t pt = sweep_measure_point(sweep_freqs[i]);
+
+						if (sweep_vpp_cal[i] > 0)
+							sweep_vpp[i] = (uint16_t)((uint32_t)pt.vpp_mv * 1000 / sweep_vpp_cal[i]);
+						else
+							sweep_vpp[i] = 0;
+
+						int16_t diff = pt.phase_deg10 - sweep_phase_ref[i];
+						if (diff > 1800) diff -= 3600;
+						if (diff < -1800) diff += 3600;
+						sweep_phase_diff[i] = diff;
+					}
+
+					if (sweep_vpp[i] > vpp_max) {
+						vpp_max = sweep_vpp[i];
+						peak_idx = i;
+					}
+
+					{
+						uint8_t y = sweep_map_y(sweep_vpp[i], vpp_max);
+						tsp_tft18_draw_pixel(i * 2,     y, CYAN);
+						tsp_tft18_draw_pixel(i * 2 + 1, y, CYAN);
+					}
+				}
+
+				tsp_dds_stop();
+
+				if (!aborted) {
+					uint16_t y_ceiling;
+
+					/* Unwrap phase to prevent +/-180 deg discontinuities */
+					for (i = 1; i < SWEEP_POINTS; i++) {
+						int16_t delta = sweep_phase_diff[i] - sweep_phase_diff[i - 1];
+						if (delta > 1800) sweep_phase_diff[i] -= 3600;
+						if (delta < -1800) sweep_phase_diff[i] += 3600;
+					}
+
+					y_ceiling = sweep_auto_ceiling(vpp_max);
+					has_data = 1;
+					view_phase = 0;
+
+					tsp_scope_clear();
+					sweep_draw_grid(y_ceiling, sweep_freqs);
+					sweep_draw_plot(sweep_vpp, SWEEP_POINTS, y_ceiling);
+
+					{
+						char buf[21];
+						uint8_t p = 0;
+						uint16_t pct = vpp_max / 10;
+						uint8_t frac = (uint8_t)(vpp_max % 10);
+						buf[p++] = 'G'; buf[p++] = ':';
+						fmt_uint16(buf, &p, pct, 3);
+						buf[p++] = '.'; buf[p++] = '0' + frac;
+						buf[p++] = '%';
+						buf[p++] = ' '; buf[p++] = '@';
+						fmt_uint32(buf, &p, sweep_freqs[peak_idx], 5);
+						buf[p++] = 'H'; buf[p++] = 'z';
+						while (p < 20) buf[p++] = ' ';
+						buf[20] = '\0';
+						tsp_tft18_show_str_color(0, 6, (uint8_t *)buf, GREEN, BLACK);
+					}
+					tsp_tft18_show_str_color(0, 7, (uint8_t *)"S2:Phase     PU:Back", GRAY1, BLACK);
+				} else {
+					tsp_scope_clear();
+					tsp_tft18_show_str_color(0, 6, (uint8_t *)"Cal OK              ", GREEN, BLACK);
+					tsp_tft18_show_str_color(0, 7, (uint8_t *)"DUT->ADC  S2:Meas   ", YELLOW, BLACK);
+				}
+			} else if (has_data) {
+				/* === Toggle gain/phase view === */
+				view_phase = !view_phase;
+				tsp_scope_clear();
+
+				if (view_phase) {
+					sweep_draw_phase_grid(sweep_freqs);
+					sweep_draw_phase_plot(sweep_phase_diff, SWEEP_POINTS);
+					tsp_tft18_show_str_color(0, 6, (uint8_t *)"Phase (deg)         ", CYAN, BLACK);
+					tsp_tft18_show_str_color(0, 7, (uint8_t *)"S2:Gain      PU:Back", GRAY1, BLACK);
+				} else {
+					uint16_t y_ceiling = sweep_auto_ceiling(vpp_max);
+					sweep_draw_grid(y_ceiling, sweep_freqs);
+					sweep_draw_plot(sweep_vpp, SWEEP_POINTS, y_ceiling);
+
+					{
+						char buf[21];
+						uint8_t p = 0;
+						uint16_t pct = vpp_max / 10;
+						uint8_t frac = (uint8_t)(vpp_max % 10);
+						buf[p++] = 'G'; buf[p++] = ':';
+						fmt_uint16(buf, &p, pct, 3);
+						buf[p++] = '.'; buf[p++] = '0' + frac;
+						buf[p++] = '%';
+						buf[p++] = ' '; buf[p++] = '@';
+						fmt_uint32(buf, &p, sweep_freqs[peak_idx], 5);
+						buf[p++] = 'H'; buf[p++] = 'z';
+						while (p < 20) buf[p++] = ' ';
+						buf[20] = '\0';
+						tsp_tft18_show_str_color(0, 6, (uint8_t *)buf, GREEN, BLACK);
+					}
+					tsp_tft18_show_str_color(0, 7, (uint8_t *)"S2:Phase     PU:Back", GRAY1, BLACK);
+				}
 			}
 		}
 

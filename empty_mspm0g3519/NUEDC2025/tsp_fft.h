@@ -21,4 +21,11 @@ typedef struct {
 
 void tsp_fft_analyze(uint8_t adc_ch, uint16_t speed, tsp_fft_result_t *out);
 
+/* Extract phase and amplitude of fundamental from raw ADC samples (FFT_N points).
+ * Uses single-frequency DFT at the known DDS frequency for precision.
+ * freq_hz: DDS output frequency. sample_delay: burst_sample delay param.
+ * Returns phase in 0.1 degree units, range [-1800, +1800].
+ * If vpp_mv is not NULL, writes peak-to-peak voltage in mV. */
+int16_t tsp_fft_extract_phase(uint16_t *raw, uint32_t freq_hz, uint16_t sample_delay, uint16_t *vpp_mv);
+
 #endif

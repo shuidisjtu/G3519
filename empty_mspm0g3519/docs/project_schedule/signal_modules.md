@@ -10,9 +10,9 @@
 | AD9833 DDS 信号源 | **可用** | 方波/正弦/三角波，100Hz~50kHz。详见 [AD9833_DDS_Use.md] |
 | AD8302 幅相检测 | 封存 | 输入网络未焊 + 需 RF 信号。详见 [AD8302_Use_Mothball.md] |
 | 通用 ADC (J2 五路) | **可用** | ADC0+ADC1 五通道，电压/频率/burst 采样 |
-| FFT 频谱分析 | **可用** | CMSIS-DSP Q15 256 点，已验证 1kHz SINE/SQR |
+| FFT 频谱分析 | **可用** | CMSIS-DSP Q15 256 点，已验证 1kHz SINE/SQR。含单频相位提取（Sweep 用） |
 | Scope 波形显示 | **可用** | 160×96px，三档时基，自动量程，差分更新 |
-| Sweep 扫频分析仪 | **可用** | DDS+ADC 联动 80 点对数扫频，绝对量程，已验证 RC 低通 |
+| Sweep 扫频分析仪 | **可用** | Cal/Meas/View 三阶段，增益归一化+相位测量，80 点对数扫频，已验证 RC 低通 |
 | UART 命令协议 | **可用** | UART0→PC 已验证，UART6→K230 待验证。详见 [M0G3519_UART_Use.md] |
 | 编码器 (旋钮) | **可用** | DDS Test 中使用 |
 

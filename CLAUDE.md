@@ -43,7 +43,7 @@ empty_mspm0g3519/
 │   ├── tsp_ad5933.h/.c                ← AD5933 阻抗测量（I2C1, 100kHz, 温度+扫频）
 │   ├── tsp_dds.h/.c                   ← AD9833 DDS 波形发生器（GPIO bit-bang, 方波/正弦/三角波）
 │   ├── tsp_adc.h/.c                   ← 通用 ADC（J2 五路, ADC0+ADC1, 电压/频率/burst 采样）
-│   ├── tsp_fft.h/.c                   ← FFT 频谱分析（CMSIS-DSP Q15, 256 点, 频率/幅值/THD）
+│   ├── tsp_fft.h/.c                   ← FFT 频谱分析（CMSIS-DSP Q15, 256 点, 频率/幅值/THD/相位）
 │   ├── tsp_scope.h/.c                 ← Scope 波形显示（160×96px, 自动量程, 差分更新, 触发）
 │   └── tsp_ad8302.h/.c                ← [封存] AD8302 幅相检测（需 RF 信号，输入网络未焊）
 └── docs/                              ← 硬件文档与项目进度
@@ -204,6 +204,13 @@ tsp_fft_analyze(ADC_CH_VIN1, FFT_FS_MED, &res);
 // res.dc_mv     — 直流偏置 mV
 // res.fs_hz     — 实际采样率 Hz
 // 速率预设: FFT_FS_FAST(~204kSPS), FFT_FS_MED(~5kSPS), FFT_FS_SLOW(~1.2kSPS)
+// --- 单频相位提取（Sweep 相位测量用） ---
+uint16_t *raw = tsp_adc_burst_sample(FFT_N, delay);
+uint16_t vpp;
+int16_t phase = tsp_fft_extract_phase(raw, freq_hz, delay, &vpp);
+// phase: 0.1° 单位, [-1800, +1800]
+// vpp: 峰峰值 mV（可选，传 NULL 跳过）
+// 内部使用单频 DFT（Goertzel-like sin/cos 递推），精度优于 FFT bin
 
 // ===== Scope 波形显示（tsp_scope.c/.h，160×96px 图形区域） =====
 tsp_scope_clear();                           // 清除波形显示区域（y=16~111）
@@ -215,10 +222,15 @@ tsp_scope_vline(x, y0, y1, color);           // 快速垂直线（bulk SPI，用
 
 // ===== Sweep 扫频分析仪（应用层，empty_mspm0g3519.c 内 static 函数） =====
 // DDS+ADC 联动，80 点对数扫频 100Hz→~50kHz
-// Y 轴绝对量程: 0 到 auto-ceiling (100/200/500/1000/1500/2000/2500/3300 mV)
+// Cal/Meas/View 三阶段工作流：
+//   Cal:  DDS→ADC 直连，存储各频点参考相位和 Vpp（sweep_vpp_cal[]）
+//   Meas: DDS→DUT→ADC，计算相位差（含 unwrap）和增益比（Vpp_meas/Vpp_cal，permille, 1000=100%）
+//   View: 切换增益曲线 / 相位曲线显示
+// 相位相干采样: sweep_measure_point() 使用 DDS reset 相位归零 + __disable_irq 确保确定性时序
+// 增益显示: "G:XXX.X% @XXXXXHz"（归一化，消除 DDS 频响误差）
+// 相位显示: "Phase (deg)" ±180° Y 轴, 0°/±90° 网格线
 // 网格: 水平 25%/50%/75% + 垂直频率标记 (200/500/1k/2k/5k/10k/20kHz, "1k"/"10k" 标签)
-// 完成后显示: Max:XXXXmV @XXXXXHz
-// Sweep 交互: S0/S1 切换通道, S2 启动扫频, PUSH 退出/中止
+// Sweep 交互: S0/S1 切换通道（Cal 后锁定）, S2 循环 Cal→Meas→切换增益/相位, PUSH 退出/中止（中止保留 Cal 数据）
 ```
 
 ## IAR 关键路径

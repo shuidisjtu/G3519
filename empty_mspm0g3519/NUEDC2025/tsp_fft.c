@@ -93,3 +93,52 @@ void tsp_fft_analyze(uint8_t adc_ch, uint16_t speed, tsp_fft_result_t *out)
         }
     }
 }
+
+int16_t tsp_fft_extract_phase(uint16_t *raw, uint32_t freq_hz, uint16_t sample_delay, uint16_t *vpp_mv)
+{
+    uint16_t i;
+    uint32_t sum = 0;
+    int16_t dc_raw;
+    float si = 0.0f, sq = 0.0f;
+
+    /* Estimate sample rate: delay=0 ~4.9us/sample, else ~(4.9+delay)us */
+    float ts_us = 4.9f + (float)sample_delay;
+    float fs = 1000000.0f / ts_us;
+
+    for (i = 0; i < FFT_N; i++)
+        sum += raw[i];
+    dc_raw = (int16_t)(sum / FFT_N);
+
+    /* Single-frequency DFT with sin/cos recursion (Goertzel-like) */
+    {
+        float omega = 2.0f * 3.14159265f * (float)freq_hz / fs;
+        float cos_w = cosf(omega);
+        float sin_w = sinf(omega);
+        float c = 1.0f, s = 0.0f;
+        for (i = 0; i < FFT_N; i++) {
+            float sample = (float)((int16_t)raw[i] - dc_raw);
+            sq += sample * c;
+            si += sample * s;
+            float c_new = c * cos_w - s * sin_w;
+            s = c * sin_w + s * cos_w;
+            c = c_new;
+        }
+    }
+
+    if (vpp_mv) {
+        /* Amplitude from DFT magnitude: |X| = sqrt(si^2+sq^2) * 2/N -> peak.
+         * Vpp = 2 * peak. Convert from ADC counts to mV. */
+        float mag = sqrtf(si * si + sq * sq) * 2.0f / (float)FFT_N;
+        float peak_to_peak_mv = mag * 2.0f * (float)ADC_VREF_MV / (float)ADC_RESOLUTION;
+        *vpp_mv = (uint16_t)(peak_to_peak_mv + 0.5f);
+    }
+
+    {
+        float phase_rad = atan2f(-si, sq);
+        float phase_deg10f = phase_rad * (1800.0f / 3.14159265f);
+        int16_t phase_deg10 = (int16_t)(phase_deg10f >= 0 ? phase_deg10f + 0.5f : phase_deg10f - 0.5f);
+        if (phase_deg10 > 1800) phase_deg10 = 1800;
+        if (phase_deg10 < -1800) phase_deg10 = -1800;
+        return phase_deg10;
+    }
+}
