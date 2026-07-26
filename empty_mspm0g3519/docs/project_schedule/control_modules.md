@@ -7,14 +7,15 @@
 
 | 模块 | 代码 | 硬件验证 | 状态 |
 |------|------|---------|------|
-| DRV8874 电机驱动 | 完整（已迁移 SysConfig） | AD2 暂无异常，迁移后待复测 | 待实物电机验证 |
+| DRV8874 电机驱动 | 完整（双PWM 4通道，SysConfig） | 已验证：两轮同步起转、方向正确 | 可用 |
 | K230 视觉模块 | 完整 | 双向通信已验证 | 可用 |
 | CCD 线阵（循迹） | 完整 | DC注入已验证 | 可用 |
-| 编码器（测速） | 完整 | 在用 | 可用 |
+| 旋钮编码器 | 完整 | 在用（菜单/参数微调） | 可用 |
+| 轮子编码器(QEI) | 完整（TIMG8/TIMG9 硬件QEI） | 已验证：双轮脉冲/速度正常 | 待标定 |
 | MPU6050 陀螺仪/IMU | 完整 | 已验证 | 可用 |
-| PID 控制器 | 完整 | 闭环菜单可用 | 可用 |
-| CCD 循迹算法 | 完整 | 待实物验证 | 可用 |
-| 里程计 | 完整 | 编码器已验证 | 可用 |
+| PID 控制器 | 完整 | 闭环菜单可用 | 增益待重调 |
+| CCD 循迹算法 | 完整 | 待实物验证 | 增益待重调 |
+| 里程计 | 完整 | 轮子编码器已接入 | COUNTS_PER_CM 待标定 |
 
 ## 各模块详情
 
@@ -23,29 +24,20 @@
 - **代码文件**：`NUEDC2025/tsp_motor.c/.h`
 - **应用入口**：`action_motor_openloop()` — 双电机独立控制、正反转、占空比调节；`action_motor_closeloop()` — PID 闭环速度控制
 - **硬件配置**（SysConfig 实例 `MOTOR_PWM`）：
-  - TIMA0 PWM 20kHz (80MHz BUSCLK, period=3999)
-  - M1: PB3(CCP0 PWM) + PB4(DIR GPIO)
-  - M2: PB0(CCP2 PWM) + PB2(DIR GPIO)
+  - TIMA0 PWM 20kHz (80MHz BUSCLK, period=3999, LOAD=3998)
+  - 4 通道双 PWM 架构（无 GPIO 方向引脚）：
+    - M1(右轮): PB3(CCP0=IN2) + PB4(CCP1=IN1)
+    - M2(左轮): PB0(CCP2=IN2) + PB2(CCP3=IN1)
   - nSLEEP: PB1，nFAULT: PA7 (10kΩ 上拉)
-- **验证状态**：2026-07-22 下午 AD2 测试 PWM 输出暂未发现异常
-- **待验证**：SysConfig 迁移后 AD2 复测（见下）、接实物电机后的实际驱动效果、nFAULT 故障检测、电流/堵转保护
+  - 死区补偿: MOTOR_DEAD_ZONE=50, MOTOR_DC_LIMIT=99
+- **验证状态**（2026-07-26）：双轮同步起转、方向正确、开环速度基本对称
 - **使用注意**：调用 `tsp_motor_set()` 前必须先 `SLEEP_HIGH()` 使能 H 桥
 - **参考文档**：`development_reference/DRV8874_Motor_Use.md`
+- **参考工程**：[HSPv2](https://github.com/yyx1248722477/hsp.git) — 同底盘/扩展板
 
-#### SysConfig 迁移（2026-07-26）
+#### 双 PWM 迁移（2026-07-26）
 
-TIMA0 曾是唯一在应用代码里手动配置的外设，违反项目「SysConfig 先行」规则，已迁移到 `.syscfg` 的 PWM 模块。`tsp_motor_init()` 从 92 行缩为一句 `DL_TimerA_startCounter()`，`tsp_motor_set()` 逻辑未动。
-
-两个配置约定，改 `.syscfg` 时勿动：
-
-| 配置项 | 值 | 原因 |
-|---|---|---|
-| `timerStartTimer` | `false` | 计数器由 `SYSCFG_DL_init()` 配置但不启动，保持「进电机场景才启用」的原有时序。改 true 会让 PWM 开机常驻 |
-| `PWM_CHANNEL_0/2.ccValue` | `0` | **必须显式设**。SysConfig 在 EDGE_ALIGN 下按 `(100-duty)*period/100-1` 反算（`PWMTimerCC.syscfg.js:107`），留默认会生成 3999 — 在本项目 CC 极性约定下等于 100% 占空比 |
-
-> **一处未定论的极性分歧**：SysConfig 认为 EDGE_ALIGN 下 CC 值与占空比成**反比**，而项目手写代码 `tsp_motor_set()` 用的是**正比**（`cc = duty*4000/100`，与 `tsp_motor.c` 原注释及 2026-07-22 AD2 实测一致）。本次通过固定 `ccValue=0` 使复位状态与迁移前逐位相同，把极性语义完全留在 `tsp_motor_set()` 内，因此该分歧不影响行为。**若后续 AD2 复测发现占空比方向相反，问题出在这里**。
-
-已验证：IAR 构建 0 error（`tsp_motor.c` 的 4 条 Pe188 为既有警告，已用 stash 基线对比确认）；CLI 以 `--compiler iar` 重新生成与提交文件逐字节一致。提交 `fec46c1`。
+原 2 通道（PB3/PB0 PWM + PB4/PB2 GPIO）改为 4 通道全 PWM。根因：GPIO 方向引脚导致正/反向衰减模式不对称（fast vs slow decay），两轮起转阈值差距 5% vs 55%。参照 HSPv2 参考工程采用双 PWM 架构。
 
 ### K230 视觉模块
 
@@ -79,13 +71,29 @@ TIMA0 曾是唯一在应用代码里手动配置的外设，违反项目「SysCo
 - **引脚互斥**：与 AD9833 DDS 共用 PC2/PC3，小车题中一般不需要 DDS，无冲突
 - **AD2 测试方案**：`development_reference/CCD_AD2_Test.md`
 
-### 编码器（测速/里程）
+### 旋钮编码器（参数微调）
 
 - **代码文件**：`NUEDC2025/tsp_encoder.c/.h`
-- **硬件**：PHA0(PA14) 中断正交解码 + PHB0(PA15) 方向判别
-- **功能**：脉冲计数（`get_count`）、速度测量（脉冲/20ms，`get_speed`）
-- **状态**：完整可用，已集成到多个菜单场景
-- **小车用途**：电机编码器测速 → PID 速度闭环。当前板载仅旋钮编码器(J5 pin37/38)，电机编码器需接拓展板的 PHA1/PHB1 或 PHA2/PHB2（注意 PHA1/PHB1 与 LCD SPI 引脚复用冲突）
+- **硬件**：PHA0(PA14) GPIO 中断正交解码 + PHB0(PA15) 方向判别
+- **用途**：Motor OpenLoop 中切换 M1/M2、Motor ClsLoop 中微调目标速度 ±1
+- **注意**：这是板上的旋钮编码器（J5 pin37/38），**不是**轮子编码器
+
+### 轮子编码器（QEI 硬件正交解码）
+
+- **代码文件**：`NUEDC2025/tsp_wheel_enc.c/.h`
+- **硬件配置**（SysConfig QEI 模块）：
+  - 右轮(J12): TIMG9, PB7(CCP0=PHB1) + PB9(CCP1=PHA1), 实例 `WHEEL_ENC_R`
+  - 左轮(J13): TIMG8, PB15(CCP0=PHB2) + PB16(CCP1=PHA2), 实例 `WHEEL_ENC_L`
+  - 5V 编码器 → SN74LVC2T45 电平转换 → 3.3V MCU
+  - BUSCLK/ULPCLK, LOAD=0xFFFF, 计数器居中 0x8000
+- **功能**：双轮独立脉冲计数和速度测量（20ms 间隔，SysTick 驱动）
+- **已接入场景**：Motor ClsLoop（速度反馈）、Line Follow（速度反馈）、Odometer（距离/角度）
+- **验证状态**（2026-07-26）：手转轮子有脉冲响应，双轮速度读数正常
+- **待完成**：
+  - `ODOM_COUNTS_PER_CM` 标定（推车 100cm 记录脉冲数）
+  - `ODOM_COUNTS_PER_DEGREE` 标定
+  - ClsLoop PID 增益重调（反馈量级变化）
+  - LineFollow PD 增益重调
 
 ### MPU6050 陀螺仪/IMU（盲走航向）
 
@@ -110,7 +118,7 @@ TIMA0 曾是唯一在应用代码里手动配置的外设，违反项目「SysCo
 
 | 冲突组 | 引脚 | 涉及模块 | 说明 |
 |--------|------|---------|------|
-| PB9/PB7 | SPI1 vs TIMG9 | LCD ↔ 编码器1(PHA1/PHB1) | 同时使用需软件互斥或改用编码器2 |
+| ~~PB9/PB7~~ | ~~SPI1 vs TIMG9~~ | ~~LCD ↔ 编码器1~~ | **已解决**：LCD SPI1 实际用 PB30/PB31/PB14，不占 PB7/PB9。两路 QEI 均可同时使用 |
 
 > 小车题中 AD9833 DDS 一般不需要，因此 CCD 与 DDS 的 PC2/PC3 冲突不影响。
 
@@ -121,9 +129,9 @@ TIMA0 曾是唯一在应用代码里手动配置的外设，违反项目「SysCo
 | 电机驱动 | DRV8874 | ✓ 代码完整 |
 | 视觉导航/色块追踪 | K230 | ✓ 已验证 |
 | CCD 循迹 | CCD + 循迹算法 | ✓ 已实现（tsp_linefollow.c） |
-| 速度闭环 | 编码器 + PID | ✓ 已实现（tsp_pid.c 增量式 D-on-PV） |
+| 速度闭环 | 轮子编码器(QEI) + PID | ✓ 已实现（待增益重调） |
 | 盲走/航向控制 | MPU6050 + Yaw 积分 | ✓ 已验证 |
-| 里程测量 | 编码器 + 里程计 | ✓ 已实现（tsp_odometer.c） |
+| 里程测量 | 轮子编码器(QEI) + 里程计 | ✓ 已实现（待标定 COUNTS_PER_CM） |
 | PID 参数调整 | 编码器旋钮 + LCD | ✓ 已实现（Speed Setting 菜单） |
 
 ## 新增模块详情

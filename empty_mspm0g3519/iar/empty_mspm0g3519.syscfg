@@ -25,6 +25,9 @@ const SPI1          = SPI.addInstance();
 const UART          = scripting.addModule("/ti/driverlib/UART", {}, false);
 const UART1         = UART.addInstance();
 const UART2         = UART.addInstance();
+const QEI           = scripting.addModule("/ti/driverlib/QEI", {}, false);
+const QEI1          = QEI.addInstance();
+const QEI2          = QEI.addInstance();
 const SYSCTL        = scripting.addModule("/ti/driverlib/SYSCTL");
 const SYSTICK       = scripting.addModule("/ti/driverlib/SYSTICK");
 const ProjectConfig = scripting.addModule("/ti/project_config/ProjectConfig");
@@ -94,7 +97,7 @@ I2C1.peripheral.sclPin.$assign    = "PB21";
 
 GPIO1.port                           = "PORTB";
 GPIO1.$name                          = "PORTB";
-GPIO1.associatedPins.create(7);
+GPIO1.associatedPins.create(5);
 GPIO1.associatedPins[0].$name        = "LED";
 GPIO1.associatedPins[0].ioStructure  = "SD";
 GPIO1.associatedPins[0].assignedPort = "PORTB";
@@ -107,10 +110,6 @@ GPIO1.associatedPins[3].$name        = "LCD_CS";
 GPIO1.associatedPins[3].assignedPin  = "28";
 GPIO1.associatedPins[4].$name        = "LCD_DC";
 GPIO1.associatedPins[4].assignedPin  = "29";
-GPIO1.associatedPins[5].$name        = "M1DIR";
-GPIO1.associatedPins[5].assignedPin  = "4";
-GPIO1.associatedPins[6].$name        = "M2DIR";
-GPIO1.associatedPins[6].assignedPin  = "2";
 
 GPIO2.port                          = "PORTA";
 GPIO2.$name                         = "PORTA";
@@ -156,18 +155,26 @@ GPIO3.associatedPins[3].direction   = "INPUT";
 GPIO3.associatedPins[3].assignedPin = "0";
 
 PWM1.$name                       = "MOTOR_PWM";
-PWM1.ccIndex                     = [0,2];
+PWM1.ccIndex                     = [0,1,2,3];
 PWM1.timerCount                  = 3999;
 PWM1.timerStartTimer             = false;
 PWM1.peripheral.$assign          = "TIMA0";
 PWM1.peripheral.ccp0Pin.$assign  = "PB3";
+PWM1.peripheral.ccp1Pin.$assign  = "PB4";
 PWM1.peripheral.ccp2Pin.$assign  = "PB0";
-PWM1.PWM_CHANNEL_0.$name         = "MOTOR_M1";
-PWM1.PWM_CHANNEL_0.ccValue       = 0;
-PWM1.PWM_CHANNEL_2.$name         = "MOTOR_M2";
-PWM1.PWM_CHANNEL_2.ccValue       = 0;
-PWM1.ccp0PinConfig.$name         = "M1_PWM";
-PWM1.ccp2PinConfig.$name         = "M2_PWM";
+PWM1.peripheral.ccp3Pin.$assign  = "PB2";
+PWM1.PWM_CHANNEL_0.$name         = "MOTOR_M1_IN2";
+PWM1.PWM_CHANNEL_0.ccValue       = 3998;
+PWM1.PWM_CHANNEL_1.$name         = "MOTOR_M1_IN1";
+PWM1.PWM_CHANNEL_1.ccValue       = 3998;
+PWM1.PWM_CHANNEL_2.$name         = "MOTOR_M2_IN2";
+PWM1.PWM_CHANNEL_2.ccValue       = 3998;
+PWM1.PWM_CHANNEL_3.$name         = "MOTOR_M2_IN1";
+PWM1.PWM_CHANNEL_3.ccValue       = 3998;
+PWM1.ccp0PinConfig.$name         = "M1_IN2_PWM";
+PWM1.ccp1PinConfig.$name         = "M1_IN1_PWM";
+PWM1.ccp2PinConfig.$name         = "M2_IN2_PWM";
+PWM1.ccp3PinConfig.$name         = "M2_IN1_PWM";
 
 SPI1.$name                              = "LCD";
 SPI1.enableDMAEvent1                    = false;
@@ -220,6 +227,20 @@ SYSTICK.period          = 80000;
 
 ProjectConfig.deviceSpin = "MSPM0G3519";
 
+QEI1.$name                      = "WHEEL_ENC_R";
+QEI1.timerStartTimer             = false;
+QEI1.loadValue                   = 0xFFFF;
+QEI1.peripheral.$assign          = "TIMG9";
+QEI1.peripheral.ccp0Pin.$assign  = "PB7";
+QEI1.peripheral.ccp1Pin.$assign  = "PB9";
+
+QEI2.$name                      = "WHEEL_ENC_L";
+QEI2.timerStartTimer             = false;
+QEI2.loadValue                   = 0xFFFF;
+QEI2.peripheral.$assign          = "TIMG8";
+QEI2.peripheral.ccp0Pin.$assign  = "PB15";
+QEI2.peripheral.ccp1Pin.$assign  = "PB16";
+
 /**
  * Pinmux solution for unlocked pins/peripherals. This ensures that minor changes to the automatic solver in a future
  * version of the tool will not impact the pinmux you originally saw.  These lines can be completely deleted in order to
@@ -238,8 +259,6 @@ GPIO1.associatedPins[1].pin.$suggestSolution       = "PB20";
 GPIO1.associatedPins[2].pin.$suggestSolution       = "PB1";
 GPIO1.associatedPins[3].pin.$suggestSolution       = "PB28";
 GPIO1.associatedPins[4].pin.$suggestSolution       = "PB29";
-GPIO1.associatedPins[5].pin.$suggestSolution       = "PB4";
-GPIO1.associatedPins[6].pin.$suggestSolution       = "PB2";
 GPIO2.associatedPins[0].pin.$suggestSolution       = "PA18";
 GPIO2.associatedPins[1].pin.$suggestSolution       = "PA14";
 GPIO2.associatedPins[2].pin.$suggestSolution       = "PA15";

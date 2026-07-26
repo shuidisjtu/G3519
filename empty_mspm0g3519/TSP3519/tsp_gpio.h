@@ -57,10 +57,7 @@
 #define DDS_SDATA_LOW()   DL_GPIO_clearPins(PORTC_PORT, PORTC_DDS_SDATA_PIN)
 #define DDS_SDATA_HIGH()  DL_GPIO_setPins(PORTC_PORT, PORTC_DDS_SDATA_PIN)
 
-/* Motor driver DRV8874 control (PB4=M1DIR, PB2=M2DIR, PB1=SLEEP, PA7=FAULT) */
-#define M1DIR_HIGH()       DL_GPIO_setPins(PORTB_PORT, PORTB_M1DIR_PIN)
-#define M1DIR_LOW()        DL_GPIO_clearPins(PORTB_PORT, PORTB_M1DIR_PIN)
-#define M2DIR_HIGH()       DL_GPIO_setPins(PORTB_PORT, PORTB_M2DIR_PIN)
-#define M2DIR_LOW()        DL_GPIO_clearPins(PORTB_PORT, PORTB_M2DIR_PIN)
+/* Motor driver DRV8874 control (PB1=SLEEP, PA7=FAULT).
+ * IN1/IN2 of both channels are TIMA0 CCP outputs, not GPIO -- see tsp_motor.c */
 
 #endif

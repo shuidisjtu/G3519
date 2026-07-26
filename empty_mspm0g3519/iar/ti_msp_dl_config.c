@@ -41,6 +41,7 @@
 #include "ti_msp_dl_config.h"
 
 DL_TimerA_backupConfig gMOTOR_PWMBackup;
+DL_TimerG_backupConfig gWHEEL_ENC_LBackup;
 DL_SPI_backupConfig gLCDBackup;
 
 /*
@@ -54,6 +55,8 @@ SYSCONFIG_WEAK void SYSCFG_DL_init(void)
     /* Module-Specific Initializations*/
     SYSCFG_DL_SYSCTL_init();
     SYSCFG_DL_MOTOR_PWM_init();
+    SYSCFG_DL_WHEEL_ENC_R_init();
+    SYSCFG_DL_WHEEL_ENC_L_init();
     SYSCFG_DL_IMU_I2C_init();
     SYSCFG_DL_UART_0_init();
     SYSCFG_DL_UART_K230_init();
@@ -62,6 +65,7 @@ SYSCONFIG_WEAK void SYSCFG_DL_init(void)
     SYSCFG_DL_SYSTICK_init();
     /* Ensure backup structures have no valid state */
 	gMOTOR_PWMBackup.backupRdy 	= false;
+	gWHEEL_ENC_LBackup.backupRdy 	= false;
 
 	gLCDBackup.backupRdy 	= false;
 
@@ -75,6 +79,7 @@ SYSCONFIG_WEAK bool SYSCFG_DL_saveConfiguration(void)
     bool retStatus = true;
 
 	retStatus &= DL_TimerA_saveConfiguration(MOTOR_PWM_INST, &gMOTOR_PWMBackup);
+	retStatus &= DL_TimerG_saveConfiguration(WHEEL_ENC_L_INST, &gWHEEL_ENC_LBackup);
 	retStatus &= DL_SPI_saveConfiguration(LCD_INST, &gLCDBackup);
 
     return retStatus;
@@ -86,6 +91,7 @@ SYSCONFIG_WEAK bool SYSCFG_DL_restoreConfiguration(void)
     bool retStatus = true;
 
 	retStatus &= DL_TimerA_restoreConfiguration(MOTOR_PWM_INST, &gMOTOR_PWMBackup, false);
+	retStatus &= DL_TimerG_restoreConfiguration(WHEEL_ENC_L_INST, &gWHEEL_ENC_LBackup, false);
 	retStatus &= DL_SPI_restoreConfiguration(LCD_INST, &gLCDBackup);
 
     return retStatus;
@@ -97,6 +103,8 @@ SYSCONFIG_WEAK void SYSCFG_DL_initPower(void)
     DL_GPIO_reset(GPIOB);
     DL_GPIO_reset(GPIOC);
     DL_TimerA_reset(MOTOR_PWM_INST);
+    DL_TimerG_reset(WHEEL_ENC_R_INST);
+    DL_TimerG_reset(WHEEL_ENC_L_INST);
     DL_I2C_reset(IMU_I2C_INST);
     DL_UART_Main_reset(UART_0_INST);
     DL_UART_Main_reset(UART_K230_INST);
@@ -108,6 +116,8 @@ SYSCONFIG_WEAK void SYSCFG_DL_initPower(void)
     DL_GPIO_enablePower(GPIOB);
     DL_GPIO_enablePower(GPIOC);
     DL_TimerA_enablePower(MOTOR_PWM_INST);
+    DL_TimerG_enablePower(WHEEL_ENC_R_INST);
+    DL_TimerG_enablePower(WHEEL_ENC_L_INST);
     DL_I2C_enablePower(IMU_I2C_INST);
     DL_UART_Main_enablePower(UART_0_INST);
     DL_UART_Main_enablePower(UART_K230_INST);
@@ -127,8 +137,17 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
 
     DL_GPIO_initPeripheralOutputFunction(GPIO_MOTOR_PWM_C0_IOMUX,GPIO_MOTOR_PWM_C0_IOMUX_FUNC);
     DL_GPIO_enableOutput(GPIO_MOTOR_PWM_C0_PORT, GPIO_MOTOR_PWM_C0_PIN);
+    DL_GPIO_initPeripheralOutputFunction(GPIO_MOTOR_PWM_C1_IOMUX,GPIO_MOTOR_PWM_C1_IOMUX_FUNC);
+    DL_GPIO_enableOutput(GPIO_MOTOR_PWM_C1_PORT, GPIO_MOTOR_PWM_C1_PIN);
     DL_GPIO_initPeripheralOutputFunction(GPIO_MOTOR_PWM_C2_IOMUX,GPIO_MOTOR_PWM_C2_IOMUX_FUNC);
     DL_GPIO_enableOutput(GPIO_MOTOR_PWM_C2_PORT, GPIO_MOTOR_PWM_C2_PIN);
+    DL_GPIO_initPeripheralOutputFunction(GPIO_MOTOR_PWM_C3_IOMUX,GPIO_MOTOR_PWM_C3_IOMUX_FUNC);
+    DL_GPIO_enableOutput(GPIO_MOTOR_PWM_C3_PORT, GPIO_MOTOR_PWM_C3_PIN);
+
+    DL_GPIO_initPeripheralInputFunction(GPIO_WHEEL_ENC_R_PHA_IOMUX,GPIO_WHEEL_ENC_R_PHA_IOMUX_FUNC);
+    DL_GPIO_initPeripheralInputFunction(GPIO_WHEEL_ENC_R_PHB_IOMUX,GPIO_WHEEL_ENC_R_PHB_IOMUX_FUNC);
+    DL_GPIO_initPeripheralInputFunction(GPIO_WHEEL_ENC_L_PHA_IOMUX,GPIO_WHEEL_ENC_L_PHA_IOMUX_FUNC);
+    DL_GPIO_initPeripheralInputFunction(GPIO_WHEEL_ENC_L_PHB_IOMUX,GPIO_WHEEL_ENC_L_PHB_IOMUX_FUNC);
 
     DL_GPIO_initPeripheralInputFunctionFeatures(GPIO_IMU_I2C_IOMUX_SDA,
         GPIO_IMU_I2C_IOMUX_SDA_FUNC, DL_GPIO_INVERSION_DISABLE,
@@ -167,10 +186,6 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
     DL_GPIO_initDigitalOutput(PORTB_LCD_CS_IOMUX);
 
     DL_GPIO_initDigitalOutput(PORTB_LCD_DC_IOMUX);
-
-    DL_GPIO_initDigitalOutput(PORTB_M1DIR_IOMUX);
-
-    DL_GPIO_initDigitalOutput(PORTB_M2DIR_IOMUX);
 
     DL_GPIO_initDigitalInputFeatures(PORTA_S0_IOMUX,
 		 DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_NONE,
@@ -225,16 +240,12 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
 		PORTB_CCD_CLK1_PIN |
 		PORTB_SLEEP_PIN |
 		PORTB_LCD_CS_PIN |
-		PORTB_LCD_DC_PIN |
-		PORTB_M1DIR_PIN |
-		PORTB_M2DIR_PIN);
+		PORTB_LCD_DC_PIN);
     DL_GPIO_enableOutput(PORTB_PORT, PORTB_LED_PIN |
 		PORTB_CCD_CLK1_PIN |
 		PORTB_SLEEP_PIN |
 		PORTB_LCD_CS_PIN |
-		PORTB_LCD_DC_PIN |
-		PORTB_M1DIR_PIN |
-		PORTB_M2DIR_PIN);
+		PORTB_LCD_DC_PIN);
     DL_GPIO_clearPins(PORTC_PORT, PORTC_CCD_SI1_PIN |
 		PORTC_CCD_SI2_PIN |
 		PORTC_CCD_CLK2_PIN);
@@ -393,22 +404,76 @@ SYSCONFIG_WEAK void SYSCFG_DL_MOTOR_PWM_init(void) {
 		DL_TIMERA_CAPTURE_COMPARE_0_INDEX);
 
     DL_TimerA_setCaptCompUpdateMethod(MOTOR_PWM_INST, DL_TIMER_CC_UPDATE_METHOD_IMMEDIATE, DL_TIMERA_CAPTURE_COMPARE_0_INDEX);
-    DL_TimerA_setCaptureCompareValue(MOTOR_PWM_INST, 0, DL_TIMER_CC_0_INDEX);
+    DL_TimerA_setCaptureCompareValue(MOTOR_PWM_INST, 3998, DL_TIMER_CC_0_INDEX);
+
+    DL_TimerA_setCaptureCompareOutCtl(MOTOR_PWM_INST, DL_TIMER_CC_OCTL_INIT_VAL_LOW,
+		DL_TIMER_CC_OCTL_INV_OUT_DISABLED, DL_TIMER_CC_OCTL_SRC_FUNCVAL,
+		DL_TIMERA_CAPTURE_COMPARE_1_INDEX);
+
+    DL_TimerA_setCaptCompUpdateMethod(MOTOR_PWM_INST, DL_TIMER_CC_UPDATE_METHOD_IMMEDIATE, DL_TIMERA_CAPTURE_COMPARE_1_INDEX);
+    DL_TimerA_setCaptureCompareValue(MOTOR_PWM_INST, 3998, DL_TIMER_CC_1_INDEX);
 
     DL_TimerA_setCaptureCompareOutCtl(MOTOR_PWM_INST, DL_TIMER_CC_OCTL_INIT_VAL_LOW,
 		DL_TIMER_CC_OCTL_INV_OUT_DISABLED, DL_TIMER_CC_OCTL_SRC_FUNCVAL,
 		DL_TIMERA_CAPTURE_COMPARE_2_INDEX);
 
     DL_TimerA_setCaptCompUpdateMethod(MOTOR_PWM_INST, DL_TIMER_CC_UPDATE_METHOD_IMMEDIATE, DL_TIMERA_CAPTURE_COMPARE_2_INDEX);
-    DL_TimerA_setCaptureCompareValue(MOTOR_PWM_INST, 0, DL_TIMER_CC_2_INDEX);
+    DL_TimerA_setCaptureCompareValue(MOTOR_PWM_INST, 3998, DL_TIMER_CC_2_INDEX);
+
+    DL_TimerA_setCaptureCompareOutCtl(MOTOR_PWM_INST, DL_TIMER_CC_OCTL_INIT_VAL_LOW,
+		DL_TIMER_CC_OCTL_INV_OUT_DISABLED, DL_TIMER_CC_OCTL_SRC_FUNCVAL,
+		DL_TIMERA_CAPTURE_COMPARE_3_INDEX);
+
+    DL_TimerA_setCaptCompUpdateMethod(MOTOR_PWM_INST, DL_TIMER_CC_UPDATE_METHOD_IMMEDIATE, DL_TIMERA_CAPTURE_COMPARE_3_INDEX);
+    DL_TimerA_setCaptureCompareValue(MOTOR_PWM_INST, 3998, DL_TIMER_CC_3_INDEX);
 
     DL_TimerA_enableClock(MOTOR_PWM_INST);
 
 
     
-    DL_TimerA_setCCPDirection(MOTOR_PWM_INST , DL_TIMER_CC0_OUTPUT | DL_TIMER_CC2_OUTPUT );
+    DL_TimerA_setCCPDirection(MOTOR_PWM_INST , DL_TIMER_CC0_OUTPUT | DL_TIMER_CC1_OUTPUT | DL_TIMER_CC2_OUTPUT | DL_TIMER_CC3_OUTPUT );
 
 
+}
+
+
+static const DL_TimerG_ClockConfig gWHEEL_ENC_RClockConfig = {
+    .clockSel = DL_TIMER_CLOCK_BUSCLK,
+    .divideRatio = DL_TIMER_CLOCK_DIVIDE_1,
+    .prescale = 0U
+};
+
+
+SYSCONFIG_WEAK void SYSCFG_DL_WHEEL_ENC_R_init(void) {
+
+    DL_TimerG_setClockConfig(
+        WHEEL_ENC_R_INST, (DL_TimerG_ClockConfig *) &gWHEEL_ENC_RClockConfig);
+
+    DL_TimerG_configQEI(WHEEL_ENC_R_INST, DL_TIMER_QEI_MODE_2_INPUT,
+        DL_TIMER_CC_INPUT_INV_NOINVERT, DL_TIMER_CC_0_INDEX);
+    DL_TimerG_configQEI(WHEEL_ENC_R_INST, DL_TIMER_QEI_MODE_2_INPUT,
+        DL_TIMER_CC_INPUT_INV_NOINVERT, DL_TIMER_CC_1_INDEX);
+    DL_TimerG_setLoadValue(WHEEL_ENC_R_INST, 65535);
+    DL_TimerG_enableClock(WHEEL_ENC_R_INST);
+}
+static const DL_TimerG_ClockConfig gWHEEL_ENC_LClockConfig = {
+    .clockSel = DL_TIMER_CLOCK_BUSCLK,
+    .divideRatio = DL_TIMER_CLOCK_DIVIDE_1,
+    .prescale = 0U
+};
+
+
+SYSCONFIG_WEAK void SYSCFG_DL_WHEEL_ENC_L_init(void) {
+
+    DL_TimerG_setClockConfig(
+        WHEEL_ENC_L_INST, (DL_TimerG_ClockConfig *) &gWHEEL_ENC_LClockConfig);
+
+    DL_TimerG_configQEI(WHEEL_ENC_L_INST, DL_TIMER_QEI_MODE_2_INPUT,
+        DL_TIMER_CC_INPUT_INV_NOINVERT, DL_TIMER_CC_0_INDEX);
+    DL_TimerG_configQEI(WHEEL_ENC_L_INST, DL_TIMER_QEI_MODE_2_INPUT,
+        DL_TIMER_CC_INPUT_INV_NOINVERT, DL_TIMER_CC_1_INDEX);
+    DL_TimerG_setLoadValue(WHEEL_ENC_L_INST, 65535);
+    DL_TimerG_enableClock(WHEEL_ENC_L_INST);
 }
 
 

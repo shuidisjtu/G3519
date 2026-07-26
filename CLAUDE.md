@@ -35,18 +35,19 @@ G3519_control/
 │   │   ├── empty_mspm0g3519.syscfg       ← SysConfig 配置
 │   │   └── ti_msp_dl_config.c/.h         ← SysConfig 生成（勿手动编辑）
 │   ├── TSP3519/                           ← 板级支持库
-│   │   ├── tsp_gpio.h/.c                  ← GPIO 宏（LED/蜂鸣器/LCD/CCD/按键/编码器/电机）
+│   │   ├── tsp_gpio.h/.c                  ← GPIO 宏（LED/蜂鸣器/LCD/CCD/按键/旋钮编码器/电源控制）
 │   │   ├── TSP_TFT18.h/.c                 ← TFT LCD 驱动（ST7735, 160x128, SPI1）
 │   │   ├── tsp_ccd.h/.c                   ← 128 像素线阵 CCD（双通道，ADC1 序列采样）
 │   │   └── tsp_menu.h/.c                  ← LCD 菜单系统（列表+子菜单+增量重绘）
 │   ├── NUEDC2025/                         ← 应用层驱动
 │   │   ├── tsp_isr.h/.c                   ← SysTick 延时 + GROUP1/UART0/UART6 中断分发
 │   │   ├── tsp_key.h/.c                   ← 4 键扫描（20ms 消抖，边沿检测）
-│   │   ├── tsp_encoder.h/.c               ← 编码器（PHA0 中断正交解码，20ms 速度）
+│   │   ├── tsp_encoder.h/.c               ← 旋钮编码器（PHA0 GPIO 中断正交解码，用于菜单/参数微调）
+│   │   ├── tsp_wheel_enc.h/.c             ← 双轮编码器（TIMG8/TIMG9 硬件 QEI，20ms 速度，闭环/里程计反馈）
 │   │   ├── tsp_uart.h/.c                  ← UART0（MFCLK 4MHz, 115200-8N1, 环形缓冲 RX）
 │   │   ├── tsp_uart_k230.h/.c             ← UART6（K230, BUSCLK 80MHz, 115200, 环形缓冲 RX）
 │   │   ├── tsp_k230.h/.c                  ← K230 YbProtocol 解析（主循环状态机, $...# 断帧）
-│   │   ├── tsp_motor.h/.c                 ← DRV8874 直流电机驱动（TIMA0 PWM, 20kHz, M1/M2独立控制）
+│   │   ├── tsp_motor.h/.c                 ← DRV8874 直流电机驱动（TIMA0 4通道PWM, 20kHz, 双PWM无GPIO方向, 死区补偿）
 │   │   ├── tsp_mpu6050.h/.c               ← MPU6050 六轴 IMU（I2C0 轮询, Yaw 积分）
 │   │   ├── tsp_pid.h/.c                   ← PID 控制器（位置式 + 增量式 D-on-PV）
 │   │   ├── tsp_linefollow.h/.c            ← CCD 循迹（PD 转向 + PD 速度 + 差速驱动）
@@ -78,12 +79,13 @@ G3519_control/
 | LCD SPI | PB30(PICO), PB31(SCLK), PB14(POCI) | `LCD_INST`=SPI1 |
 | LCD 控制 | PA8(RST), PA9(BL), PB28(CS), PB29(DC) | `LCD_RST/BL/CS/DC` |
 | 按键 | PA18(S0), PC0(S1), PA16(S2), PA12(PUSH) | `S0()/S1()/S2()/PUSH()` |
-| 编码器 | PA14(PHA0), PA15(PHB0) | `PHA0()/PHB0()` |
+| 旋钮编码器 | PA14(PHA0), PA15(PHB0) | `PHA0()/PHB0()` |
 | CCD 数字 | PC9(SI1), PB20(CLK1), PC4(SI2), PC5(CLK2) | `CCD_SI1/CLK1/SI2/CLK2` |
 | CCD ADC | PB18(CH5-CCD1), PB19(CH6-CCD2), PB17(CH4-CCD3), PA17(CH2-CCD4) | `CCD_ADC_INST`=ADC1 (SysConfig) |
-| 电机 PWM | PB3(CCP0), PB0(CCP2) | `MOTOR_PWM_INST`=TIMA0 (SysConfig) |
-| 电机 DIR | PB4(M1DIR), PB2(M2DIR) | `PORTB_M1DIR/M2DIR_PIN` |
+| 电机 PWM | PB3(CCP0=M1_IN2), PB4(CCP1=M1_IN1), PB0(CCP2=M2_IN2), PB2(CCP3=M2_IN1) | `MOTOR_PWM_INST`=TIMA0 (SysConfig) |
 | 电源控制 | PB1(SLEEP), PA7(FAULT) | `SLEEP_HIGH/LOW`, `FAULT()` |
+| 轮子编码器1 | PB7(CCP0=PHB1), PB9(CCP1=PHA1), J12 | `WHEEL_ENC_R_INST`=TIMG9 (SysConfig QEI) |
+| 轮子编码器2 | PB15(CCP0=PHB2), PB16(CCP1=PHA2), J13 | `WHEEL_ENC_L_INST`=TIMG8 (SysConfig QEI) |
 | UART6 (K230) | PC11(TX), PC10(RX)，J11 排座 | `UART_K230_INST`（SysConfig 宏） |
 | UART0 | PA10(TX), PA11(RX) | IOMUX_PINCM21/22 |
 | MPU6050 (I2C0) | PB21(SCL), PB22(SDA), PC8(INT) | `IMU_I2C_INST`（SysConfig 宏） |
@@ -97,7 +99,7 @@ G3519_control/
 | Board | - | DEBUGSS (SWD) |
 | SYSCTL | - | 时钟树（HFXT 40MHz -> SYSPLL -> 80MHz） |
 | SYSTICK | - | 1ms 定时（period=80000） |
-| GPIO1 | PORTB | 7 引脚：LED/CCD_CLK1/SLEEP/LCD_CS/LCD_DC/M1DIR/M2DIR |
+| GPIO1 | PORTB | 5 引脚：LED/CCD_CLK1/SLEEP/LCD_CS/LCD_DC |
 | GPIO2 | PORTA | 9 引脚：S0/PHA0/PHB0/PUSH/BUZZ/S2/FAULT/LCD_RST/LCD_BL |
 | GPIO3 | PORTC | 4 引脚：CCD_SI1/CCD_SI2/CCD_CLK2/S1 |
 | SPI1 | LCD | ST7735 LCD（BUSCLK, 10MHz, PB30/PB31/PB14） |
@@ -105,13 +107,16 @@ G3519_control/
 | UART2 | UART_K230 | K230 视觉模块（BUSCLK 80MHz, 115200, PC10/PC11） |
 | ADC12 | CCD_ADC | CCD 模拟采样（ADC1, ULPCLK/8, 序列 MEM0-3→CH5/6/4/2） |
 | I2C | IMU_I2C | MPU6050 六轴 IMU（I2C0, 400kHz, PB21-SCL/PB22-SDA） |
-| PWM | MOTOR_PWM | 电机 PWM（TIMA0, 20kHz, CC0-PB3/M1, CC2-PB0/M2） |
+| PWM | MOTOR_PWM | 电机 PWM（TIMA0, 20kHz, 4通道: CC0-PB3/M1_IN2, CC1-PB4/M1_IN1, CC2-PB0/M2_IN2, CC3-PB2/M2_IN1） |
+| QEI | WHEEL_ENC_R | 右轮编码器（TIMG9, BUSCLK/ULPCLK, PB7-CCP0/PHB1, PB9-CCP1/PHA1, J12） |
+| QEI | WHEEL_ENC_L | 左轮编码器（TIMG8, BUSCLK/ULPCLK, PB15-CCP0/PHB2, PB16-CCP1/PHA2, J13） |
 
 **全部外设均由 SysConfig 配置**，应用代码不再手动初始化外设寄存器。
 
-> **MOTOR_PWM 两个约定**（改 `.syscfg` 时勿动）：
+> **MOTOR_PWM 约定**（改 `.syscfg` 时勿动）：
 > - `timerStartTimer = false` — 计数器由 `SYSCFG_DL_init()` 配置但不启动，进电机场景时 `tsp_motor_init()` 才 `startCounter()`。改成 true 会让 PWM 开机常驻。
-> - `PWM_CHANNEL_x.ccValue = 0` — 必须显式置 0。SysConfig 在 EDGE_ALIGN 下按 `(100-duty)*period/100-1` 反算 ccValue，默认值会生成 3999，在本项目的 CC 极性约定下等于 100% 占空比。
+> - `PWM_CHANNEL_x.ccValue = 3998` — 对应 0% 占空比。EDGE_ALIGN 下 LOAD=period-1=3998，CC=LOAD 表示输出始终为低。CC 与 duty 反相：CC=0 → 100%，CC=3998 → 0%。
+> - 4 通道双 PWM 架构：每个电机占两个通道（IN1+IN2），空闲侧钉 0%，驱动侧给 duty。两个方向均为快衰减模式。无 GPIO 方向引脚。
 
 ## API 速查
 
@@ -152,12 +157,24 @@ tsp_menu_init(title, items, count);    // S0(上) S1(下) S2(确认) PUSH(返回
 uint8_t back = tsp_menu_run();         // 主循环调用
 tsp_menu_switch(title, items, count);  // 切换子菜单
 
-// ===== 编码器（tsp_encoder.c） =====
+// ===== 旋钮编码器（tsp_encoder.c，PA14/PA15 GPIO 中断正交解码） =====
+// 用于菜单参数微调（Motor OpenLoop 切 M1/M2、ClsLoop 目标速度±1）
 tsp_encoder_enable();                  // 启用 PHA0 中断 + 复位计数（进入编码器场景时调用）
 tsp_encoder_disable();                 // 禁用 PHA0 中断 + 复位（退出时调用，防浮空中断）
 int32_t cnt = tsp_encoder_get_count(); // 原子读取
 int16_t spd = tsp_encoder_get_speed(); // 脉冲/20ms
 tsp_encoder_reset();
+
+// ===== 双轮编码器（tsp_wheel_enc.c，TIMG9/TIMG8 硬件 QEI，J12右轮/J13左轮） =====
+// 5V 编码器 → SN74LVC2T45 电平转换 → TIMG QEI 硬件正交解码
+// 速度每 20ms 在 SysTick 中由 tsp_wheel_enc_update() 计算
+tsp_wheel_enc_start();                           // 启动 TIMG8/TIMG9 计数器（居中 0x8000）
+tsp_wheel_enc_stop();                            // 停止两路计数器
+tsp_wheel_enc_update();                          // SysTick 中自动调用（20ms 间隔）
+int16_t spd = tsp_wheel_enc_speed(MOTOR1);       // 右轮速度（脉冲/20ms）
+int16_t spd = tsp_wheel_enc_speed(MOTOR2);       // 左轮速度
+int32_t cnt = tsp_wheel_enc_count(MOTOR1);       // 右轮累积脉冲
+tsp_wheel_enc_reset();                           // 双轮计数/速度清零
 
 // ===== UART0（tsp_uart.c，时钟=MFCLK 4MHz，PD0 安全） =====
 // ⚠️ 已从 main() 移除：脱机（不接 DAPLink）时 NRST=2.5V 导致 MFCLK 不稳定，
@@ -194,16 +211,18 @@ tsp_ccd_snapshot(CCD2, pixels);        // 同上，读取 MEM1 (ADC1 CH4)
 tsp_ccd_set_exposure(10);              // 曝光时间 ms (1-100, 默认 10)
 // LCD 波形绘制见 action_ccd_test(): 128px x 63px 区域，erasure-based 增量更新
 
-// ===== DRV8874 DC Motor Driver（TIMA0 PWM 由 SysConfig 配置, 实例 MOTOR_PWM）=====
-// 硬件: PB3(CCP0=M1 PWM), PB4(GPIO=M1 DIR), PB0(CCP2=M2 PWM), PB2(GPIO=M2 DIR)
+// ===== DRV8874 DC Motor Driver（TIMA0 4通道PWM 由 SysConfig 配置, 实例 MOTOR_PWM）=====
+// 硬件: PB3(CCP0=M1_IN2), PB4(CCP1=M1_IN1), PB0(CCP2=M2_IN2), PB2(CCP3=M2_IN1)
+// 双 PWM 架构：驱动侧给 duty、空闲侧钉 0%，两个方向均为快衰减
+// 镜像安装补偿：MOTOR1(右轮)/MOTOR2(左轮) 通道角色对调，MOTOR_FORWARD 统一为车辆前进
+// 死区补偿：非零请求自动 +50（MOTOR_DEAD_ZONE），映射到可用转速区间
 // 控制: nSLEEP=PB1, nFAULT=PA7(10kΩ上拉, 无VBAT时也读HIGH)
-// ⚠️ SysConfig 中 CC OCTL 必须为 INIT_VAL_LOW (默认值), 不可改为 INIT_VAL_HIGH
-// AD2: J10(M1)/J11(M2) 需VBAT; 无VBAT时接J14侧IN1/IN2看3.3V逻辑
-tsp_motor_init();                            // 仅启动 TIMA0 计数器 (PWM 配置由 SysConfig 完成)
+// CC 与 duty 反相：LOAD=3998, CC=LOAD→0%, CC=0→100%
+tsp_motor_init();                            // 复位4通道CC + 启动 TIMA0 计数器
 SLEEP_HIGH();                                // 使能 H 桥 (必须在 set 之前)
-tsp_motor_set(MOTOR1, MOTOR_FORWARD, 50);    // 电机1 正向 50%
-tsp_motor_set(MOTOR2, MOTOR_BACKWARD, 30);   // 电机2 反向 30% (M1/M2 独立控制)
-tsp_motor_stop(MOTOR1);                      // 停止电机1 (coast)
+tsp_motor_set(MOTOR1, MOTOR_FORWARD, 50);    // 右轮前进 50%（实际输出=50+50=99%，受DC_LIMIT限制）
+tsp_motor_set(MOTOR2, MOTOR_FORWARD, 30);    // 左轮前进 30%（实际输出=30+50=80%）
+tsp_motor_stop(MOTOR1);                      // 停止右轮 (coast: IN1=L, IN2=L)
 tsp_motor_stop_all();                        // 停止全部
 if (tsp_motor_fault()) { ... }               // 检测 nFAULT (LOW=故障)
 SLEEP_LOW();                                 // 禁用 H 桥

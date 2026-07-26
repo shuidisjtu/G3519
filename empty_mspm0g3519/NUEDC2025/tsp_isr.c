@@ -1,5 +1,6 @@
 #include "tsp_isr.h"
 #include "tsp_encoder.h"
+#include "tsp_wheel_enc.h"
 #include "tsp_uart.h"
 #include "tsp_uart_k230.h"
 
@@ -21,6 +22,7 @@ void SysTick_Handler(void)
 
     /* Periodic encoder speed update every 20ms */
     tsp_encoder_update_speed();
+    tsp_wheel_enc_update();
 }
 
 /* ================================================================

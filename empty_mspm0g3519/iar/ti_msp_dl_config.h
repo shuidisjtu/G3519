@@ -105,13 +105,57 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 #define GPIO_MOTOR_PWM_C0_IOMUX                                  (IOMUX_PINCM16)
 #define GPIO_MOTOR_PWM_C0_IOMUX_FUNC                 IOMUX_PINCM16_PF_TIMA0_CCP0
 #define GPIO_MOTOR_PWM_C0_IDX                                DL_TIMER_CC_0_INDEX
+/* GPIO defines for channel 1 */
+#define GPIO_MOTOR_PWM_C1_PORT                                             GPIOB
+#define GPIO_MOTOR_PWM_C1_PIN                                      DL_GPIO_PIN_4
+#define GPIO_MOTOR_PWM_C1_IOMUX                                  (IOMUX_PINCM17)
+#define GPIO_MOTOR_PWM_C1_IOMUX_FUNC                 IOMUX_PINCM17_PF_TIMA0_CCP1
+#define GPIO_MOTOR_PWM_C1_IDX                                DL_TIMER_CC_1_INDEX
 /* GPIO defines for channel 2 */
 #define GPIO_MOTOR_PWM_C2_PORT                                             GPIOB
 #define GPIO_MOTOR_PWM_C2_PIN                                      DL_GPIO_PIN_0
 #define GPIO_MOTOR_PWM_C2_IOMUX                                  (IOMUX_PINCM12)
 #define GPIO_MOTOR_PWM_C2_IOMUX_FUNC                 IOMUX_PINCM12_PF_TIMA0_CCP2
 #define GPIO_MOTOR_PWM_C2_IDX                                DL_TIMER_CC_2_INDEX
+/* GPIO defines for channel 3 */
+#define GPIO_MOTOR_PWM_C3_PORT                                             GPIOB
+#define GPIO_MOTOR_PWM_C3_PIN                                      DL_GPIO_PIN_2
+#define GPIO_MOTOR_PWM_C3_IOMUX                                  (IOMUX_PINCM15)
+#define GPIO_MOTOR_PWM_C3_IOMUX_FUNC                 IOMUX_PINCM15_PF_TIMA0_CCP3
+#define GPIO_MOTOR_PWM_C3_IDX                                DL_TIMER_CC_3_INDEX
 
+
+
+
+/* Defines for WHEEL_ENC_R */
+#define WHEEL_ENC_R_INST                                                   TIMG9
+#define WHEEL_ENC_R_INST_IRQHandler                             TIMG9_IRQHandler
+#define WHEEL_ENC_R_INST_INT_IRQN                               (TIMG9_INT_IRQn)
+/* Pin configuration defines for WHEEL_ENC_R PHA Pin */
+#define GPIO_WHEEL_ENC_R_PHA_PORT                                          GPIOB
+#define GPIO_WHEEL_ENC_R_PHA_PIN                                   DL_GPIO_PIN_7
+#define GPIO_WHEEL_ENC_R_PHA_IOMUX                               (IOMUX_PINCM24)
+#define GPIO_WHEEL_ENC_R_PHA_IOMUX_FUNC              IOMUX_PINCM24_PF_TIMG9_CCP0
+/* Pin configuration defines for WHEEL_ENC_R PHB Pin */
+#define GPIO_WHEEL_ENC_R_PHB_PORT                                          GPIOB
+#define GPIO_WHEEL_ENC_R_PHB_PIN                                   DL_GPIO_PIN_9
+#define GPIO_WHEEL_ENC_R_PHB_IOMUX                               (IOMUX_PINCM26)
+#define GPIO_WHEEL_ENC_R_PHB_IOMUX_FUNC              IOMUX_PINCM26_PF_TIMG9_CCP1
+
+/* Defines for WHEEL_ENC_L */
+#define WHEEL_ENC_L_INST                                                   TIMG8
+#define WHEEL_ENC_L_INST_IRQHandler                             TIMG8_IRQHandler
+#define WHEEL_ENC_L_INST_INT_IRQN                               (TIMG8_INT_IRQn)
+/* Pin configuration defines for WHEEL_ENC_L PHA Pin */
+#define GPIO_WHEEL_ENC_L_PHA_PORT                                          GPIOB
+#define GPIO_WHEEL_ENC_L_PHA_PIN                                  DL_GPIO_PIN_15
+#define GPIO_WHEEL_ENC_L_PHA_IOMUX                               (IOMUX_PINCM32)
+#define GPIO_WHEEL_ENC_L_PHA_IOMUX_FUNC              IOMUX_PINCM32_PF_TIMG8_CCP0
+/* Pin configuration defines for WHEEL_ENC_L PHB Pin */
+#define GPIO_WHEEL_ENC_L_PHB_PORT                                          GPIOB
+#define GPIO_WHEEL_ENC_L_PHB_PIN                                  DL_GPIO_PIN_16
+#define GPIO_WHEEL_ENC_L_PHB_IOMUX                               (IOMUX_PINCM33)
+#define GPIO_WHEEL_ENC_L_PHB_IOMUX_FUNC              IOMUX_PINCM33_PF_TIMG8_CCP1
 
 
 
@@ -235,12 +279,6 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 /* Defines for LCD_DC: GPIOB.29 with pinCMx 66 on package pin 30 */
 #define PORTB_LCD_DC_PIN                                        (DL_GPIO_PIN_29)
 #define PORTB_LCD_DC_IOMUX                                       (IOMUX_PINCM66)
-/* Defines for M1DIR: GPIOB.4 with pinCMx 17 on package pin 25 */
-#define PORTB_M1DIR_PIN                                          (DL_GPIO_PIN_4)
-#define PORTB_M1DIR_IOMUX                                        (IOMUX_PINCM17)
-/* Defines for M2DIR: GPIOB.2 with pinCMx 15 on package pin 23 */
-#define PORTB_M2DIR_PIN                                          (DL_GPIO_PIN_2)
-#define PORTB_M2DIR_IOMUX                                        (IOMUX_PINCM15)
 /* Port definition for Pin Group PORTA */
 #define PORTA_PORT                                                       (GPIOA)
 
@@ -303,6 +341,8 @@ void SYSCFG_DL_SYSCTL_init(void);
 
 bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 void SYSCFG_DL_MOTOR_PWM_init(void);
+void SYSCFG_DL_WHEEL_ENC_R_init(void);
+void SYSCFG_DL_WHEEL_ENC_L_init(void);
 void SYSCFG_DL_IMU_I2C_init(void);
 void SYSCFG_DL_UART_0_init(void);
 void SYSCFG_DL_UART_K230_init(void);

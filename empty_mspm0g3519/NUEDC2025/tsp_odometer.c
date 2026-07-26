@@ -17,6 +17,7 @@
 
 #include "tsp_odometer.h"
 #include "tsp_encoder.h"
+#include "tsp_wheel_enc.h"
 #include "tsp_key.h"
 #include "tsp_gpio.h"
 #include "TSP_TFT18.h"
@@ -93,7 +94,7 @@ void tsp_odometer_demo(void)
     char     line[20];
 
     /* Initialize encoder (already enabled by caller) */
-    tsp_encoder_reset();
+    tsp_wheel_enc_reset();
 
     /* Draw initial frame */
     odom_draw_frame(mode);
@@ -110,7 +111,7 @@ void tsp_odometer_demo(void)
         /*
          * Read encoder (atomic on M0+ via PRIMASK in tsp_encoder_get_count)
          */
-        int32_t cur_count = tsp_encoder_get_count();
+        int32_t cur_count = tsp_wheel_enc_count(MOTOR1);
 
         if (first_read) {
             /* Anchor: skip delta on first read */
@@ -198,7 +199,7 @@ void tsp_odometer_demo(void)
 
         /* Speed */
         {
-            int16_t spd = tsp_encoder_get_speed();
+            int16_t spd = tsp_wheel_enc_speed(MOTOR1);
             if (spd != last_disp_speed || last_disp_speed == -999) {
                 tsp_tft18_show_int16(ODOM_VAL_COL, 6, spd);
                 last_disp_speed = spd;
@@ -218,7 +219,7 @@ void tsp_odometer_demo(void)
                 distance    = 0.0f;
                 angle       = 0.0f;
                 first_read  = 1;
-                tsp_encoder_reset();
+                tsp_wheel_enc_reset();
                 odom_update_mode_lcd(mode);
                 /* Force display refresh */
                 last_disp_dist  = -1.0f;
@@ -236,7 +237,7 @@ void tsp_odometer_demo(void)
                 distance    = 0.0f;
                 angle       = 0.0f;
                 first_read  = 1;
-                tsp_encoder_reset();
+                tsp_wheel_enc_reset();
                 odom_update_mode_lcd(mode);
                 last_disp_dist  = -1.0f;
                 last_disp_ang   = -1.0f;

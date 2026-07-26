@@ -20,61 +20,86 @@
 
 #include "tsp_motor.h"
 
+/* Duty percent -> CC value. EDGE_ALIGN counts DOWN from LOAD with
+ * LACT=CCP_HIGH at load and CDACT=CCP_LOW at match, so the output is high over
+ * LOAD..CC -- a larger CC means a shorter high time.
+ *   duty 0%   -> CC = LOAD (match on the first tick, output stays low)
+ *   duty 100% -> CC = 0    (output stays high) */
+static uint16_t duty_to_cc(uint16_t duty_pct)
+{
+    return (uint16_t)(MOTOR_PWM_LOAD -
+        (((uint32_t)duty_pct * MOTOR_PWM_LOAD) / 100U));
+}
+
 void tsp_motor_init(void)
 {
-    /* TIMA0 PWM (20kHz, CC0=PB3/M1, CC2=PB0/M2) is configured by SysConfig in
-     * SYSCFG_DL_MOTOR_PWM_init(). Counter is left stopped there so PWM only
-     * runs while a motor scene is active. */
+    /* TIMA0 PWM (20kHz, CC0=PB3/CC1=PB4 for M1, CC2=PB0/CC3=PB2 for M2) is
+     * configured by SysConfig in SYSCFG_DL_MOTOR_PWM_init(). The counter is
+     * left stopped there so PWM only runs while a motor scene is active. */
+
+    /* Force all four channels to 0% before the counter runs. CC survives
+     * across scene exits, so starting without this makes the motor spin on
+     * entry. */
+    DL_TimerA_setCaptureCompareValue(MOTOR_PWM_INST,
+        duty_to_cc(0), DL_TIMER_CC_0_INDEX);
+    DL_TimerA_setCaptureCompareValue(MOTOR_PWM_INST,
+        duty_to_cc(0), DL_TIMER_CC_1_INDEX);
+    DL_TimerA_setCaptureCompareValue(MOTOR_PWM_INST,
+        duty_to_cc(0), DL_TIMER_CC_2_INDEX);
+    DL_TimerA_setCaptureCompareValue(MOTOR_PWM_INST,
+        duty_to_cc(0), DL_TIMER_CC_3_INDEX);
+
     DL_TimerA_startCounter(MOTOR_PWM_INST);
 }
 
 void tsp_motor_set(uint8_t motor, uint8_t dir, uint16_t duty_pct)
 {
-    uint16_t cc_val;
-    uint32_t dir_pin;
-    uint32_t cc_index;
+    uint16_t dc;
+    DL_TIMER_CC_INDEX cc_in1, cc_in2;
 
     if (motor > 1) return;
 
-    /* Clamp duty cycle */
-    if (duty_pct > MOTOR_DC_LIMIT) duty_pct = MOTOR_DC_LIMIT;
-
-    /* Convert percent to CC value (0..3999) */
-    cc_val = (uint16_t)(((uint32_t)duty_pct * (MOTOR_PWM_PERIOD + 1U)) / 100U);
-
-    /* Per-motor pin assignments */
+    /* Both half-bridges are PWM (IN1 and IN2); the idle side is parked at 0%
+     * and only the driving side carries duty. That keeps both directions in
+     * fast-decay mode -- with IN1 as a static GPIO the reverse direction fell
+     * into slow decay, and the two wheels needed wildly different duty to
+     * start moving (5% vs 55% measured on this chassis). */
     if (motor == MOTOR1) {
-        dir_pin  = PORTB_M1DIR_PIN;     /* PB4 = M1IN1 = direction */
-        cc_index = DL_TIMER_CC_0_INDEX; /* PB3 = M1IN2 = PWM */
+        cc_in2 = DL_TIMER_CC_0_INDEX;   /* PB3 */
+        cc_in1 = DL_TIMER_CC_1_INDEX;   /* PB4 */
     } else {
-        dir_pin  = PORTB_M2DIR_PIN;     /* PB2 = M2IN1 = direction */
-        cc_index = DL_TIMER_CC_2_INDEX; /* PB0 = M2IN2 = PWM */
+        cc_in2 = DL_TIMER_CC_2_INDEX;   /* PB0 */
+        cc_in1 = DL_TIMER_CC_3_INDEX;   /* PB2 */
     }
 
     switch (dir) {
     case MOTOR_FORWARD:
-        /* IN1=LOW, IN2=PWM */
-        DL_GPIO_clearPins(PORTB_PORT, dir_pin);
-        DL_TimerA_setCaptureCompareValue(MOTOR_PWM_INST, cc_val, cc_index);
-        break;
-
     case MOTOR_BACKWARD:
-        /* IN1=HIGH, IN2=PWM */
-        DL_GPIO_setPins(PORTB_PORT, dir_pin);
-        DL_TimerA_setCaptureCompareValue(MOTOR_PWM_INST, cc_val, cc_index);
+        dc = duty_pct;
+        if (dc > 0U) dc += MOTOR_DEAD_ZONE;
+        if (dc > MOTOR_DC_LIMIT) dc = MOTOR_DC_LIMIT;
+
+        /* Mirrored mounting: MOTOR1 drives IN2 where MOTOR2 drives IN1, so
+         * both move the vehicle the same way for a given dir. */
+        if ((dir == MOTOR_FORWARD) == (motor == MOTOR1)) {
+            DL_TimerA_setCaptureCompareValue(MOTOR_PWM_INST, duty_to_cc(dc), cc_in2);
+            DL_TimerA_setCaptureCompareValue(MOTOR_PWM_INST, duty_to_cc(0),  cc_in1);
+        } else {
+            DL_TimerA_setCaptureCompareValue(MOTOR_PWM_INST, duty_to_cc(0),  cc_in2);
+            DL_TimerA_setCaptureCompareValue(MOTOR_PWM_INST, duty_to_cc(dc), cc_in1);
+        }
         break;
 
     case MOTOR_COAST:
-        /* IN1=LOW, IN2=0 -> Hi-Z */
-        DL_GPIO_clearPins(PORTB_PORT, dir_pin);
-        DL_TimerA_setCaptureCompareValue(MOTOR_PWM_INST, 0, cc_index);
+        /* IN1=L, IN2=L -> Hi-Z */
+        DL_TimerA_setCaptureCompareValue(MOTOR_PWM_INST, duty_to_cc(0), cc_in2);
+        DL_TimerA_setCaptureCompareValue(MOTOR_PWM_INST, duty_to_cc(0), cc_in1);
         break;
 
     case MOTOR_BRAKE:
-        /* IN1=HIGH, IN2=100% -> low-side brake */
-        DL_GPIO_setPins(PORTB_PORT, dir_pin);
-        DL_TimerA_setCaptureCompareValue(MOTOR_PWM_INST,
-            MOTOR_PWM_PERIOD + 1U, cc_index);
+        /* IN1=H, IN2=H -> low-side brake */
+        DL_TimerA_setCaptureCompareValue(MOTOR_PWM_INST, duty_to_cc(100), cc_in2);
+        DL_TimerA_setCaptureCompareValue(MOTOR_PWM_INST, duty_to_cc(100), cc_in1);
         break;
 
     default:

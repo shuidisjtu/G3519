@@ -1144,6 +1144,12 @@
             <name>$PROJ_DIR$\..\NUEDC2025\tsp_encoder.h</name>
         </file>
         <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_wheel_enc.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_wheel_enc.h</name>
+        </file>
+        <file>
             <name>$PROJ_DIR$\..\NUEDC2025\tsp_isr.c</name>
         </file>
         <file>

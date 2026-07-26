@@ -33,10 +33,26 @@
 #define MOTOR_COAST      2    /* IN1=L, IN2=L -> Hi-Z coast */
 #define MOTOR_BRAKE      3    /* IN1=H, IN2=H -> low-side brake */
 
+/* ===== Chassis mounting =====
+ * MOTOR1 drives the right wheel, MOTOR2 the left. They are mounted mirrored,
+ * so the two motors swap which half-bridge carries the PWM for a given
+ * direction -- see tsp_motor_set(). MOTOR_FORWARD always means the vehicle
+ * moves forward. */
+#define MOTOR_RIGHT      MOTOR1
+#define MOTOR_LEFT       MOTOR2
+
 /* ===== PWM parameters ===== */
 /* Must stay in sync with PWM1.timerCount in empty_mspm0g3519.syscfg */
-#define MOTOR_PWM_PERIOD    3999U   /* TIMA0 period (0..3999), 80MHz/4000=20kHz */
-#define MOTOR_DC_LIMIT      100U    /* max duty cycle percent */
+#define MOTOR_PWM_PERIOD    3999U   /* TIMA0 period, 80MHz/4000=20kHz */
+/* DL_Timer_initTwoCCPWMMode() programs LOAD = period-1 (dl_timer.c:445), so
+ * the counter tops out at 3998. A CC above LOAD is never matched, which leaves
+ * the output stuck high (100%) -- CC must stay within 0..MOTOR_PWM_LOAD. */
+#define MOTOR_PWM_LOAD      (MOTOR_PWM_PERIOD - 1U)
+#define MOTOR_DC_LIMIT      99U     /* max duty cycle percent */
+/* Duty consumed by static friction before the wheel turns. Measured on this
+ * chassis by HSPv2 (Utilities/HSP_MOTOR.h); added to any non-zero request so
+ * the caller's 0-100 maps onto the usable band. */
+#define MOTOR_DEAD_ZONE     50U
 
 /* ===== API ===== */
 

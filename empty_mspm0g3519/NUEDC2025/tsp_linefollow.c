@@ -31,6 +31,7 @@
 #include "tsp_ccd.h"
 #include "tsp_motor.h"
 #include "tsp_encoder.h"
+#include "tsp_wheel_enc.h"
 #include "tsp_key.h"
 #include "tsp_gpio.h"
 #include "TSP_TFT18.h"
@@ -206,7 +207,7 @@ void tsp_linefollow_process(uint8_t ccd_ch, lf_result_t *result)
     }
 
     /* 5. Speed PD Control */
-    current_speed = tsp_encoder_get_speed();   /* pulses per 20ms */
+    current_speed = tsp_wheel_enc_speed(MOTOR1);   /* pulses per 20ms */
     {
         float target_spd = (float)g_base_speed * LF_SPEED_SCALE;
         float dc_f = tsp_pid_pos_step(&g_speed_pid, target_spd,
@@ -287,7 +288,7 @@ void tsp_linefollow_drive(const lf_result_t *result)
 
 int16_t tsp_linefollow_get_speed(void)
 {
-    return tsp_encoder_get_speed();
+    return tsp_wheel_enc_speed(MOTOR1);
 }
 
 void tsp_linefollow_set_speed(uint8_t speed)
@@ -348,6 +349,7 @@ void tsp_linefollow_demo(void)
     tsp_motor_init();
     SLEEP_HIGH();
     tsp_encoder_enable();
+    tsp_wheel_enc_start();
     tsp_linefollow_init();
 
     /* Draw static UI */
@@ -455,7 +457,7 @@ void tsp_linefollow_demo(void)
             tsp_tft18_show_uint16(LF_VAL_COL, 3, (uint16_t)lf.tape_width);
 
             /* Speed (pulses/20ms) */
-            tsp_tft18_show_int16(LF_VAL_COL, 4, tsp_encoder_get_speed());
+            tsp_tft18_show_int16(LF_VAL_COL, 4, tsp_wheel_enc_speed(MOTOR1));
 
             /* DC command */
             tsp_tft18_show_int16(LF_VAL_COL, 5, lf.dc_base);
@@ -489,5 +491,6 @@ void tsp_linefollow_demo(void)
     /* Cleanup */
     tsp_motor_stop_all();
     SLEEP_LOW();
+    tsp_wheel_enc_stop();
     tsp_encoder_disable();
 }

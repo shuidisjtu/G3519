@@ -6,6 +6,7 @@
 #include "tsp_key.h"
 #include "tsp_menu.h"
 #include "tsp_encoder.h"
+#include "tsp_wheel_enc.h"
 #include "tsp_uart_k230.h"
 #include "tsp_k230.h"
 #include "tsp_motor.h"
@@ -565,6 +566,9 @@ static void action_motor_openloop(void)
 	tsp_tft18_show_str_color(0, 7, (uint8_t *)"Enc:M1/M2 PUSH:exit", GRAY1, BLACK);
 
 	tsp_motor_init();
+	/* Push a known-stopped state to hardware before enabling the H-bridge --
+	 * otherwise CC/DIR keep whatever they held on entry and the motor spins. */
+	tsp_motor_stop_all();
 	SLEEP_HIGH();
 	tsp_encoder_enable();
 
@@ -675,8 +679,12 @@ static void action_motor_closeloop(void)
 
 	/* Init subsystems */
 	tsp_motor_init();
+	/* Push a known-stopped state to hardware before enabling the H-bridge --
+	 * otherwise CC/DIR keep whatever they held on entry and the motor spins. */
+	tsp_motor_stop_all();
 	SLEEP_HIGH();
 	tsp_encoder_enable();
+	tsp_wheel_enc_start();
 
 	/* Draw UI */
 	tsp_tft18_clear(BLACK);
@@ -743,7 +751,7 @@ static void action_motor_closeloop(void)
 
 		/* PID control: apply PWM every loop */
 		if (motor_run) {
-			current_speed = tsp_encoder_get_speed();
+			current_speed = tsp_wheel_enc_speed(MOTOR1);
 			dc = (int16_t)tsp_pid_inc_step(&spd_pid,
 			                                (float)target_speed,
 			                                (float)current_speed,
@@ -753,10 +761,6 @@ static void action_motor_closeloop(void)
 			if (target_speed == 0) {
 				dc = 0;
 				tsp_pid_inc_reset(&spd_pid);
-			}
-			/* Sub-deadzone clamp at low speed */
-			if (dc < 38 && target_speed <= 30) {
-				dc = 0;
 			}
 
 			/* Apply to motors */
@@ -775,7 +779,7 @@ static void action_motor_closeloop(void)
 		tick++;
 		if (tick >= 10) {
 			tick = 0;
-			current_speed = tsp_encoder_get_speed();
+			current_speed = tsp_wheel_enc_speed(MOTOR1);
 			tsp_tft18_show_int16(72, 3, current_speed);
 			if (motor_run) tsp_tft18_show_uint16(72, 4, (uint16_t)(dc >= 0 ? dc : -dc));
 			/* Kp/Ki/Kd display — use snprintf to prevent overflow */
@@ -790,6 +794,7 @@ static void action_motor_closeloop(void)
 exit_closedloop:
 	tsp_motor_stop_all();
 	SLEEP_LOW();
+	tsp_wheel_enc_stop();
 	tsp_encoder_disable();
 	tsp_menu_request_redraw();
 }
@@ -800,7 +805,9 @@ exit_closedloop:
 static void action_odometer(void)
 {
 	tsp_encoder_enable();
+	tsp_wheel_enc_start();
 	tsp_odometer_demo();
+	tsp_wheel_enc_stop();
 	tsp_encoder_disable();
 	tsp_menu_request_redraw();
 }
