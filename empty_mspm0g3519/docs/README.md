@@ -21,7 +21,7 @@
 
 | 文档 | 说明 |
 |---|---|
-| [signal_modules.md](project_schedule/signal_modules.md) | 信号题模块实现进度（AD5933/AD9833/ADC/FFT/UART 命令协议） |
+| [signal_modules.md](project_schedule/signal_modules.md) | 信号题模块实现进度（AD5933/AD9833/ADC/FFT/Scope/Sweep/UART 命令协议） |
 
 ## 软件文档
 

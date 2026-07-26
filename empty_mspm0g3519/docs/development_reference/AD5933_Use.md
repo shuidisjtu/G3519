@@ -74,9 +74,11 @@ VIN  ←──│ U6A(跨阻) ←── J15-4            │←── 待测阻�
 
 ```
 主菜单
-  ├─ K230 Test
+  ├─ AD5933 Test  ──→  阻抗测试界面（自动流程）
   ├─ DDS Test
-  └─ AD5933 Test  ──→  阻抗测试界面（自动流程）
+  ├─ ADC Test
+  ├─ Scope
+  └─ Sweep
 ```
 
 **按键**：
@@ -89,14 +91,14 @@ VIN  ←──│ U6A(跨阻) ←── J15-4            │←── 待测阻�
 
 #### 阶段 1：标定（Calibration）
 
-初始化 + 温度读取后，LCD 提示：
+初始化后，LCD 提示：
 
 ```
 ┌──────────────────────┐
 │AD5933 Impedance      │ ← Row 0
 │C: B0 08              │ ← Row 1 (CTRL 回读)
-│T: 32.1C              │ ← Row 2 (温度)
-│Cal: 18000 Ohm        │ ← Row 3, CYAN (校准电阻值)
+│                      │ ← Row 2
+│Cal: 220 Ohm          │ ← Row 3, CYAN (校准电阻值)
 │Connect Rcal to J15   │ ← Row 4
 │S2=Calibrate          │ ← Row 5
 │                      │
@@ -104,9 +106,9 @@ VIN  ←──│ U6A(跨阻) ←── J15-4            │←── 待测阻�
 └──────────────────────┘
 ```
 
-**操作**：在 J15-4/5 之间接入 **18kΩ** 校准电阻，按 `S2` 开始标定。标定成功后显示 "Cal OK! Replace DUT"，再按 `S2` 进入测量。
+**操作**：在 J15-4/5 之间接入 **220Ω** 校准电阻，按 `S2` 开始标定。标定成功后显示 "Cal OK! Replace DUT"，再按 `S2` 进入测量。
 
-> 校准电阻值在代码中定义为 `CAL_RESISTANCE = 18000.0f`，可根据手头电阻修改。
+> 校准电阻值在代码中定义为 `CAL_RESISTANCE = 220.0f`，可根据手头电阻修改。
 
 #### 阶段 2：实时测量
 
@@ -114,11 +116,11 @@ VIN  ←──│ U6A(跨阻) ←── J15-4            │←── 待测阻�
 ┌──────────────────────┐
 │AD5933 Impedance      │ ← Row 0, YELLOW/BLUE
 │C: B0 08              │ ← Row 1, WHITE
-│T: 32.1C              │ ← Row 2, WHITE (每 1s 刷新)
+│cM:12345 M:12345      │ ← Row 2, CYAN (校准 Mag / 当前 Mag)
 │Freq: 1000 Hz         │ ← Row 3, WHITE
 │Real: -16857          │ ← Row 4, WHITE (每次刷新)
 │Imag: -21896          │ ← Row 5, WHITE (每次刷新)
-│Z   : 18032 Ohm       │ ← Row 6, GREEN (阻抗值)
+│Z   : 00220 Ohm       │ ← Row 6, GREEN (阻抗值)
 │PUSH to exit          │ ← Row 7, GRAY
 └──────────────────────┘
 ```
@@ -384,7 +386,8 @@ I2C1.peripheral.sclPin.$assign = "PA29";
 
 ## 7. 已知限制
 
-- **校准未实现**：GainFactor 标定（需已知电阻）和系统相位补偿尚未编写
+- **系统相位补偿未实现**：GainFactor 标定已完成，但系统相位补偿尚未编写
+- **温度显示已移除**：当前测试界面不再调用 `tsp_ad5933_read_temperature()`，Row 2 改为显示校准 Mag / 当前 Mag
 - **RFB 固定 20kΩ**：板载 R37，不可软件调节。待测阻抗远小于 RFB 时 VIN 信号微弱，远大于 RFB 时可能 ADC 饱和。更换 RFB 需焊接替换 R37
 - **J15 仅两路信号**：SENSE_IN (Pin 4) 和 VOUT_BUF (Pin 5)，其余为 NC 或 GND。不支持四线 Kelvin 接法
 

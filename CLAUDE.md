@@ -48,6 +48,7 @@ empty_mspm0g3519/
 │   ├── tsp_dds.h/.c                   ← AD9833 DDS 波形发生器（GPIO bit-bang, 方波/正弦/三角波）
 │   ├── tsp_adc.h/.c                   ← 通用 ADC（J2 五路, ADC0+ADC1, 电压/频率/burst 采样）
 │   ├── tsp_fft.h/.c                   ← FFT 频谱分析（CMSIS-DSP Q15, 256 点, 频率/幅值/THD）
+│   ├── tsp_scope.h/.c                 ← Scope 波形显示（160×96px, 自动量程, 差分更新, 触发）
 │   └── tsp_ad8302.h/.c                ← [封存] AD8302 幅相检测（需 RF 信号，输入网络未焊）
 └── docs/                              ← 硬件文档与项目进度
     ├── development_reference/         ← 开发参考文档
@@ -111,7 +112,7 @@ tsp_key_init();                        // 按键
 tsp_uart_init(115200);                 // UART0（TX 已加 10ms 超时，脱机安全）
 tsp_uart_rx_enable();                  // 开启 RX 中断
 tsp_cmd_init(tsp_uart_send_string, tsp_uart_read_byte, tsp_uart_available); // 命令协议
-tsp_menu_init(title, items, count);    // 菜单（AD5933 Test, DDS Test, ADC Test）
+tsp_menu_init(title, items, count);    // 菜单（AD5933 Test, DDS Test, ADC Test, Scope, Sweep）
 
 // ===== GPIO 宏（tsp_gpio.h） =====
 LED_ON(); LED_OFF(); LED_TOGGLE();
@@ -207,6 +208,21 @@ tsp_fft_analyze(ADC_CH_VIN1, FFT_FS_MED, &res);
 // res.dc_mv     — 直流偏置 mV
 // res.fs_hz     — 实际采样率 Hz
 // 速率预设: FFT_FS_FAST(~204kSPS), FFT_FS_MED(~5kSPS), FFT_FS_SLOW(~1.2kSPS)
+
+// ===== Scope 波形显示（tsp_scope.c/.h，160×96px 图形区域） =====
+tsp_scope_clear();                           // 清除波形显示区域（y=16~111）
+tsp_scope_draw_grid();                       // 绘制虚线网格（25%/50%/75% 水平 + 垂直中线）
+tsp_scope_draw_wave(samples, count);         // 绘制波形（自动量程 + 差分更新，无闪烁）
+tsp_scope_vline(x, y0, y1, color);           // 快速垂直线（bulk SPI，用于波形/扫频绘制）
+// 时基预设: SCOPE_TB_FAST(0), SCOPE_TB_MED(40), SCOPE_TB_SLOW(200)
+// Scope 交互: S0/S1 切换通道, S2 切换时基, PUSH 退出
+
+// ===== Sweep 扫频分析仪（应用层，empty_mspm0g3519.c 内 static 函数） =====
+// DDS+ADC 联动，80 点对数扫频 100Hz→~50kHz
+// Y 轴绝对量程: 0 到 auto-ceiling (100/200/500/1000/1500/2000/2500/3300 mV)
+// 网格: 水平 25%/50%/75% + 垂直频率标记 (200/500/1k/2k/5k/10k/20kHz, "1k"/"10k" 标签)
+// 完成后显示: Max:XXXXmV @XXXXXHz
+// Sweep 交互: S0/S1 切换通道, S2 启动扫频, PUSH 退出/中止
 ```
 
 ## IAR 关键路径
