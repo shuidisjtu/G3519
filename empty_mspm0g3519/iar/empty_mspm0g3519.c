@@ -10,6 +10,7 @@
 #include "tsp_adc.h"
 #include "tsp_uart.h"
 #include "tsp_cmd.h"
+#include "tsp_scope.h"
 #include <math.h>
 
 /* ===== Global state ===== */
@@ -548,12 +549,380 @@ exit_ad5933:
 	tsp_menu_request_redraw();
 }
 
+/* ===== Scope (Waveform Display) ===== */
+
+static const uint16_t scope_tb_presets[] = {
+	SCOPE_TB_FAST, SCOPE_TB_MED, SCOPE_TB_SLOW
+};
+static const char *scope_tb_names[] = { "FAST", "MED", "SLOW" };
+#define SCOPE_TB_COUNT  3
+
+static void action_scope_test(void)
+{
+	uint8_t  ch_idx   = 0;
+	uint8_t  tb_idx   = 1;          /* start with MED */
+	uint8_t  last_ch  = 0xFF;
+	uint8_t  last_tb  = 0xFF;
+	uint8_t  tick     = 0;
+
+	tsp_adc_init();
+	tsp_adc_select_channel(0);
+
+	tsp_tft18_clear(BLACK);
+	tsp_tft18_draw_line_h(0, 16, 160, BLUE);
+	tsp_tft18_show_str_color(0, 7, (uint8_t *)"S0/S1:CH S2:TB  PU:X", GRAY1, BLACK);
+
+	tsp_scope_clear();
+	tsp_scope_draw_grid();
+
+	while (1) {
+		tsp_key_scan();
+		if (tsp_key_pressed(KEY_PUSH)) break;
+
+		if (tsp_key_pressed(KEY_S0)) {
+			ch_idx = (ch_idx == 0) ? ADC_CH_COUNT - 1 : ch_idx - 1;
+		}
+		if (tsp_key_pressed(KEY_S1)) {
+			ch_idx = (ch_idx + 1 >= ADC_CH_COUNT) ? 0 : ch_idx + 1;
+		}
+		if (tsp_key_pressed(KEY_S2)) {
+			tb_idx = (tb_idx + 1 >= SCOPE_TB_COUNT) ? 0 : tb_idx + 1;
+		}
+
+		/* Update title on channel or timebase change */
+		if (ch_idx != last_ch || tb_idx != last_tb) {
+			if (ch_idx != last_ch) {
+				tsp_adc_select_channel(ch_idx);
+				tsp_scope_clear();
+				tsp_scope_draw_grid();
+			}
+
+			/* Title: "Scope [VIN1] MED   " */
+			{
+				char buf[21];
+				uint8_t p = 0;
+				const char *s;
+				buf[p++] = 'S'; buf[p++] = 'c'; buf[p++] = 'o';
+				buf[p++] = 'p'; buf[p++] = 'e'; buf[p++] = ' ';
+				buf[p++] = '[';
+				for (s = tsp_adc_channels[ch_idx].label; *s; s++)
+					buf[p++] = *s;
+				buf[p++] = ']'; buf[p++] = ' ';
+				for (s = scope_tb_names[tb_idx]; *s; s++)
+					buf[p++] = *s;
+				while (p < 20) buf[p++] = ' ';
+				buf[20] = '\0';
+				tsp_tft18_show_str_color(0, 0, (uint8_t *)buf, YELLOW, BLUE);
+			}
+
+			last_ch = ch_idx;
+			last_tb = tb_idx;
+		}
+
+		/* Sample + draw waveform every ~50ms (5 ticks) */
+		tick++;
+		if (tick >= 5) {
+			tick = 0;
+
+			{
+				uint16_t *raw = tsp_adc_burst_sample(SCOPE_SAMPLE_N,
+				                                     scope_tb_presets[tb_idx]);
+				uint16_t trig = 0;
+				uint16_t i;
+				uint16_t vmin = 4095, vmax = 0;
+				uint16_t mid;
+
+				/* Find min/max for trigger level */
+				for (i = 0; i < SCOPE_SAMPLE_N; i++) {
+					if (raw[i] < vmin) vmin = raw[i];
+					if (raw[i] > vmax) vmax = raw[i];
+				}
+				mid = (vmin + vmax) / 2;
+
+				/* Rising-edge trigger */
+				if (vmax - vmin > 50) {
+					for (i = 1; i < SCOPE_SAMPLE_N - SCOPE_WIDTH; i++) {
+						if (raw[i - 1] < mid && raw[i] >= mid) {
+							trig = i;
+							break;
+						}
+					}
+				}
+
+				tsp_scope_draw_wave(&raw[trig], SCOPE_WIDTH);
+			}
+		}
+
+		delay_1ms(10);
+	}
+
+	tsp_menu_request_redraw();
+}
+
+/* ===== Sweep Frequency Analyzer ===== */
+
+#define SWEEP_POINTS  80
+
+static uint16_t sweep_measure_vpp(uint32_t freq_hz)
+{
+	uint16_t count, dly;
+	uint16_t *buf;
+	uint16_t vmin = 4095, vmax = 0;
+	uint16_t i;
+	uint32_t settle;
+
+	/* Adaptive sample rate based on known DDS frequency */
+	if (freq_hz < 300) {
+		count = 512; dly = 200;
+	} else if (freq_hz < 3000) {
+		count = 512; dly = 20;
+	} else if (freq_hz < 20000) {
+		count = 256; dly = 0;
+	} else {
+		count = 64;  dly = 0;
+	}
+
+	/* Wait 5 cycles for DUT settling (min 2ms) */
+	settle = 5000 / freq_hz;
+	if (settle < 2) settle = 2;
+	delay_1ms((uint16_t)settle);
+
+	buf = tsp_adc_burst_sample(count, dly);
+
+	for (i = 0; i < count; i++) {
+		if (buf[i] < vmin) vmin = buf[i];
+		if (buf[i] > vmax) vmax = buf[i];
+	}
+
+	return (uint16_t)((uint32_t)(vmax - vmin) * ADC_VREF_MV / ADC_RESOLUTION);
+}
+
+static uint16_t sweep_auto_ceiling(uint16_t vpp_max)
+{
+	static const uint16_t scales[] = {100, 200, 500, 1000, 1500, 2000, 2500, 3300};
+	uint8_t i;
+	if (vpp_max == 0) return 100;
+	for (i = 0; i < sizeof(scales) / sizeof(scales[0]); i++) {
+		if (vpp_max <= scales[i]) return scales[i];
+	}
+	return 3300;
+}
+
+static uint8_t sweep_map_y(uint16_t vpp, uint16_t y_ceiling)
+{
+	uint8_t h;
+	if (y_ceiling == 0) return SCOPE_GRAPH_Y1;
+	h = (uint8_t)((uint32_t)vpp * (SCOPE_GRAPH_H - 1) / y_ceiling);
+	if (h > SCOPE_GRAPH_H - 1) h = SCOPE_GRAPH_H - 1;
+	return SCOPE_GRAPH_Y1 - h;
+}
+
+static void sweep_draw_grid(uint16_t y_ceiling, uint32_t *freqs)
+{
+	uint16_t x;
+	uint8_t m, j, vy;
+	uint8_t y25 = sweep_map_y(y_ceiling / 4, y_ceiling);
+	uint8_t y50 = sweep_map_y(y_ceiling / 2, y_ceiling);
+	uint8_t y75 = sweep_map_y(y_ceiling * 3 / 4, y_ceiling);
+	static const uint32_t vmarks[] = {200, 500, 1000, 2000, 5000, 10000, 20000};
+
+	for (x = 0; x < SCOPE_WIDTH; x += 4) {
+		tsp_tft18_draw_pixel(x, y25, GRAY2);
+		tsp_tft18_draw_pixel(x, y50, GRAY2);
+		tsp_tft18_draw_pixel(x, y75, GRAY2);
+	}
+
+	for (m = 0; m < sizeof(vmarks) / sizeof(vmarks[0]); m++) {
+		for (j = 0; j < SWEEP_POINTS - 1; j++) {
+			if (freqs[j] <= vmarks[m] && freqs[j + 1] > vmarks[m]) {
+				uint16_t vx = (uint16_t)j * 2;
+				for (vy = SCOPE_GRAPH_Y0; vy <= SCOPE_GRAPH_Y1; vy += 4) {
+					tsp_tft18_draw_pixel(vx, vy, GRAY2);
+				}
+				if (vmarks[m] == 1000) {
+					tsp_tft18_show_char_color(vx + 2, SCOPE_GRAPH_Y0, '1', GRAY1, BLACK);
+					tsp_tft18_show_char_color(vx + 10, SCOPE_GRAPH_Y0, 'k', GRAY1, BLACK);
+				} else if (vmarks[m] == 10000) {
+					tsp_tft18_show_char_color(vx + 2, SCOPE_GRAPH_Y0, '1', GRAY1, BLACK);
+					tsp_tft18_show_char_color(vx + 10, SCOPE_GRAPH_Y0, '0', GRAY1, BLACK);
+					tsp_tft18_show_char_color(vx + 18, SCOPE_GRAPH_Y0, 'k', GRAY1, BLACK);
+				}
+				break;
+			}
+		}
+	}
+}
+
+static void sweep_draw_plot(uint16_t *vpp_data, uint8_t count, uint16_t y_ceiling)
+{
+	uint8_t i;
+	uint8_t y_prev, y_cur;
+
+	if (y_ceiling == 0 || count == 0) return;
+
+	y_prev = sweep_map_y(vpp_data[0], y_ceiling);
+	tsp_tft18_draw_pixel(0, y_prev, CYAN);
+	tsp_tft18_draw_pixel(1, y_prev, CYAN);
+
+	for (i = 1; i < count; i++) {
+		uint16_t x = (uint16_t)i * 2;
+		y_cur = sweep_map_y(vpp_data[i], y_ceiling);
+		tsp_scope_vline(x,     y_prev, y_cur, CYAN);
+		tsp_scope_vline(x + 1, y_prev, y_cur, CYAN);
+		y_prev = y_cur;
+	}
+}
+
+static void action_sweep_test(void)
+{
+	uint8_t  ch_idx   = 0;
+	uint8_t  last_ch  = 0xFF;
+	uint32_t sweep_freqs[SWEEP_POINTS];
+	uint16_t sweep_vpp[SWEEP_POINTS];
+	uint8_t  has_data = 0;
+	uint8_t  i;
+
+	/* Generate log-spaced frequencies: 100Hz -> ~50kHz */
+	{
+		uint32_t f = 100;
+		for (i = 0; i < SWEEP_POINTS; i++) {
+			sweep_freqs[i] = f;
+			f = f + f * 82 / 1000;
+			if (f > 50000) f = 50000;
+		}
+	}
+
+	tsp_adc_init();
+	tsp_adc_select_channel(0);
+
+	tsp_tft18_clear(BLACK);
+	tsp_tft18_draw_line_h(0, 16, 160, BLUE);
+	tsp_tft18_show_str_color(0, 7, (uint8_t *)"S0/S1:CH S2:Run PU:X", GRAY1, BLACK);
+
+	while (1) {
+		tsp_key_scan();
+		if (tsp_key_pressed(KEY_PUSH)) break;
+
+		/* Channel select */
+		if (tsp_key_pressed(KEY_S0)) {
+			ch_idx = (ch_idx == 0) ? ADC_CH_COUNT - 1 : ch_idx - 1;
+		}
+		if (tsp_key_pressed(KEY_S1)) {
+			ch_idx = (ch_idx + 1 >= ADC_CH_COUNT) ? 0 : ch_idx + 1;
+		}
+
+		/* Update title on channel change */
+		if (ch_idx != last_ch) {
+			tsp_adc_select_channel(ch_idx);
+			{
+				char buf[21];
+				uint8_t p = 0;
+				const char *s;
+				buf[p++] = 'S'; buf[p++] = 'w'; buf[p++] = 'e';
+				buf[p++] = 'e'; buf[p++] = 'p'; buf[p++] = ' ';
+				buf[p++] = '[';
+				for (s = tsp_adc_channels[ch_idx].label; *s; s++)
+					buf[p++] = *s;
+				buf[p++] = ']';
+				while (p < 20) buf[p++] = ' ';
+				buf[20] = '\0';
+				tsp_tft18_show_str_color(0, 0, (uint8_t *)buf, YELLOW, BLUE);
+			}
+			last_ch = ch_idx;
+		}
+
+		/* S2: start sweep */
+		if (tsp_key_pressed(KEY_S2)) {
+			uint16_t vpp_max = 0;
+			uint8_t  peak_idx = 0;
+			uint8_t  aborted = 0;
+
+			has_data = 0;
+			tsp_scope_clear();
+
+			for (i = 0; i < SWEEP_POINTS; i++) {
+				/* Check abort */
+				tsp_key_scan();
+				if (tsp_key_pressed(KEY_PUSH)) { aborted = 1; break; }
+
+				/* Progress indicator */
+				{
+					char buf[21];
+					uint8_t p = 0;
+					buf[p++] = 'S'; buf[p++] = 'w'; buf[p++] = 'e';
+					buf[p++] = 'e'; buf[p++] = 'p'; buf[p++] = 'i';
+					buf[p++] = 'n'; buf[p++] = 'g'; buf[p++] = '.';
+					buf[p++] = '.'; buf[p++] = '.'; buf[p++] = ' ';
+					fmt_uint16(buf, &p, (uint16_t)(i + 1), 2);
+					buf[p++] = '/';
+					fmt_uint16(buf, &p, SWEEP_POINTS, 2);
+					while (p < 20) buf[p++] = ' ';
+					buf[20] = '\0';
+					tsp_tft18_show_str_color(0, 7, (uint8_t *)buf, WHITE, BLACK);
+				}
+
+				/* DDS + measure */
+				tsp_dds_set_output(sweep_freqs[i], AD9833_SINE);
+				sweep_vpp[i] = sweep_measure_vpp(sweep_freqs[i]);
+
+				if (sweep_vpp[i] > vpp_max) {
+					vpp_max = sweep_vpp[i];
+					peak_idx = i;
+				}
+
+				/* Progressive dot */
+				{
+					uint8_t y = sweep_map_y(sweep_vpp[i], vpp_max);
+					tsp_tft18_draw_pixel(i * 2,     y, CYAN);
+					tsp_tft18_draw_pixel(i * 2 + 1, y, CYAN);
+				}
+			}
+
+			tsp_dds_stop();
+
+			if (!aborted) {
+				uint16_t y_ceiling = sweep_auto_ceiling(vpp_max);
+				has_data = 1;
+
+				tsp_scope_clear();
+				sweep_draw_grid(y_ceiling, sweep_freqs);
+				sweep_draw_plot(sweep_vpp, SWEEP_POINTS, y_ceiling);
+			}
+
+			tsp_tft18_show_str_color(0, 7, (uint8_t *)"S0/S1:CH S2:Run PU:X", GRAY1, BLACK);
+
+			/* Show peak Vpp and frequency on row 6 */
+			if (has_data) {
+				char buf[21];
+				uint8_t p = 0;
+				buf[p++] = 'M'; buf[p++] = 'a'; buf[p++] = 'x';
+				buf[p++] = ':';
+				fmt_uint16(buf, &p, vpp_max, 4);
+				buf[p++] = 'm'; buf[p++] = 'V';
+				buf[p++] = ' '; buf[p++] = '@';
+				fmt_uint32(buf, &p, sweep_freqs[peak_idx], 5);
+				buf[p++] = 'H'; buf[p++] = 'z';
+				while (p < 20) buf[p++] = ' ';
+				buf[20] = '\0';
+				tsp_tft18_show_str_color(0, 6, (uint8_t *)buf, GREEN, BLACK);
+			}
+		}
+
+		delay_1ms(10);
+	}
+
+	tsp_dds_stop();
+	tsp_menu_request_redraw();
+}
+
 /* ===== Main Menu ===== */
 
 static tsp_menu_item_t main_menu[] = {
 	{"AD5933 Test",    action_ad5933_test},
 	{"DDS Test",       action_dds_test},
 	{"ADC Test",       action_adc_test},
+	{"Scope",          action_scope_test},
+	{"Sweep",          action_sweep_test},
 };
 
 #define MAIN_MENU_COUNT  (sizeof(main_menu) / sizeof(main_menu[0]))

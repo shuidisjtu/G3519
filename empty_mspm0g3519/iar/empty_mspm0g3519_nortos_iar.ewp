@@ -1200,6 +1200,12 @@
         <file>
             <name>$PROJ_DIR$\..\NUEDC2025\tsp_fft.h</name>
         </file>
+        <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_scope.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_scope.h</name>
+        </file>
     </group>
     <group>
         <name>SysConfig Generated Files</name>

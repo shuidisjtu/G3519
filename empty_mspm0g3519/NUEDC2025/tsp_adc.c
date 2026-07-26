@@ -144,36 +144,15 @@ static uint32_t freq_from_buf(uint16_t count, uint32_t sample_period_us_x10,
 
 void tsp_adc_measure(tsp_adc_meas_t *out)
 {
-    uint16_t i;
     uint16_t vmax, vmin, dc_raw;
 
     /* Pass 1: fast burst (~4.9us/sample = 49 in 0.1us units) */
-    for (i = 0; i < ADC_FREQ_BUF_SIZE; i++) {
-        DL_ADC12_startConversion(g_cur_adc);
-        while (!DL_ADC12_getRawInterruptStatus(
-                   g_cur_adc, DL_ADC12_INTERRUPT_MEM0_RESULT_LOADED))
-            ;
-        DL_ADC12_clearInterruptStatus(
-            g_cur_adc, DL_ADC12_INTERRUPT_MEM0_RESULT_LOADED);
-        g_freq_buf[i] = DL_ADC12_getMemResult(g_cur_adc, DL_ADC12_MEM_IDX_0);
-        DL_ADC12_enableConversions(g_cur_adc);
-    }
-
+    tsp_adc_burst_sample(ADC_FREQ_BUF_SIZE, 0);
     out->freq_hz = freq_from_buf(ADC_FREQ_BUF_SIZE, 49, &vmax, &vmin, &dc_raw);
 
     if (out->freq_hz == 0) {
-        /* Pass 2: slow burst (~200us/sample = 2000 in 0.1us units) */
-        for (i = 0; i < ADC_FREQ_BUF_SIZE; i++) {
-            DL_ADC12_startConversion(g_cur_adc);
-            while (!DL_ADC12_getRawInterruptStatus(
-                       g_cur_adc, DL_ADC12_INTERRUPT_MEM0_RESULT_LOADED))
-                ;
-            DL_ADC12_clearInterruptStatus(
-                g_cur_adc, DL_ADC12_INTERRUPT_MEM0_RESULT_LOADED);
-            g_freq_buf[i] = DL_ADC12_getMemResult(g_cur_adc, DL_ADC12_MEM_IDX_0);
-            DL_ADC12_enableConversions(g_cur_adc);
-            delay_cycles(15760);
-        }
+        /* Pass 2: slow burst (~200us/sample = 2000 in 0.1us units), delay=197 → 197*80=15760 cycles */
+        tsp_adc_burst_sample(ADC_FREQ_BUF_SIZE, 197);
         out->freq_hz = freq_from_buf(ADC_FREQ_BUF_SIZE, 2000, &vmax, &vmin, &dc_raw);
     }
 
