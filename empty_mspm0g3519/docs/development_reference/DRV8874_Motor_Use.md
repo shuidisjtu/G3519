@@ -1,6 +1,6 @@
 # DRV8874 直流电机驱动使用说明
 
-> 状态：**已验证**（2026-07-22）— PWM 波形 AD2 确认，M1/M2 独立控制正常。
+> 状态：**待复测**（2026-07-26）— PWM 波形曾于 2026-07-22 经 AD2 确认、M1/M2 独立控制正常，但此后 TIMA0 已迁移至 SysConfig，需按 §7 复测。
 
 ## 1. 硬件概要
 
@@ -122,3 +122,38 @@ nFAULT 是开漏输出，拓展板有 10kΩ 上拉到 MCU_3V3。
 | P3 | PWM 极性反转，J10 无波形 | `setCaptureCompareOutCtl()` 手动覆盖为 `INIT_VAL_HIGH`，导致 CC=0 时输出恒高 | 删除覆盖，保留 SDK 默认 `INIT_VAL_LOW` |
 | P4 | 进度条溢出 LCD | 20 段 + 前缀 = 27 字符 > LCD 20 字符 | 缩为 10 段 |
 | P5 | nFAULT 显示不随 duty 更新 | 仅跟踪 fault 值，未跟踪 duty 变化 | 改为无条件刷新 |
+
+## 7. SysConfig 迁移与 AD2 复测（2026-07-26）
+
+TIMA0 已从手动初始化迁移到 SysConfig（实例 `MOTOR_PWM`，提交 `fec46c1`）。生成代码与原手写逐行等价，但 **P3 那条极性坑现在换了一种形式存在**，复测必须重点验证。
+
+### 为什么必须复测
+
+原手写代码**不调用** `setCaptureCompareOutCtl()`，靠 `initPWMMode()` 的默认值。SysConfig **会显式调用**它，值取自 `PWM_CHANNEL_x.initVal`（默认 `LOW`，已确认生成为 `INIT_VAL_LOW`）。此外 SysConfig 对 `ccValue` 的换算与本项目相反：
+
+| | 本项目 `tsp_motor_set()` | SysConfig `updateCCValue()` |
+|---|---|---|
+| 公式 | `cc = duty*4000/100`（正比） | `cc = (100-duty)*period/100-1`（反比） |
+| duty=0% | cc=0 | cc=3999 |
+| duty=100% | cc=4000 | cc=0 |
+
+已通过在 `.syscfg` 中固定 `ccValue = 0` 使复位状态与迁移前一致。**若复测发现占空比方向反了（设 20% 实测 80%），根因就在此处**，届时应修正 `tsp_motor_set()` 的换算方向，而不是去改 `.syscfg`。
+
+### 复测步骤
+
+**准备**：打开 SW1 接通 VBAT（否则 J10/J11 无输出）；DAPLink VTref 接 `MCU_3V3`；烧录当前固件。
+
+| 步骤 | 操作 | 预期现象 | 若不符 |
+|---|---|---|---|
+| 1 | 开机，停在主菜单，AD2 探头接 J14 Pin13(M1IN2) | **无波形，恒低电平**。`timerStartTimer=false` 使计数器未启动 | 若已有 20kHz 波形 → `.syscfg` 的 `timerStartTimer` 被改成了 true |
+| 2 | 进入 `Motor OpenLoop`，duty 保持 0% | 仍**恒低电平** | 若为恒高或满占空比 → `ccValue` 未固定为 0，见上表 |
+| 3 | S1 按 4 次调到 duty=20% | 20kHz 方波（周期 50µs），**高电平占 20%**（10µs 高 / 40µs 低） | 高电平占 80% → 极性反了，改 `tsp_motor_set()` 换算方向 |
+| 4 | 继续调到 50% / 80% | 高电平占比随之变化，周期始终 50µs | 周期不是 50µs → 检查 `.syscfg` 的 `timerCount`（应 3999）与 `clockPrescale`（应 1） |
+| 5 | S2 切换方向 | J14 Pin14(M1IN1) 电平翻转；Pin13 PWM 波形不变 | DIR 不翻转 → 查 PB4 GPIO 配置 |
+| 6 | 旋钮左旋切到 M2，重复步骤 3 | J14 Pin15(M2IN2) 出现同样波形；**M1 波形保持不变** | M1 跟着变 → CC0/CC2 通道映射错误 |
+| 7 | 探头改接 J10（量程 ±25V） | 有 VBAT 时可见 20kHz 调制的电机驱动波形（幅值接近 VBAT） | 无输出 → 确认 SW1、检查 nSLEEP(PB1) 是否为高 |
+| 8 | 退出菜单（PUSH） | J14 恢复恒低；LCD 回主菜单 | — |
+
+**LCD 侧预期**：`Motor OpenLoop` 页面显示 `M1: FWD  20%`、进度条 `Duty:[##        ]`、`nFAULT: OK`。注意 nFAULT 在无 VBAT 时也显示 OK（见 §5），不能作为 VBAT 已接通的判据。
+
+**闭环连带验证**：`Motor ClsLoop` 需接电机编码器才有意义（当前板载仅旋钮编码器，见 `control_modules.md`）。未接编码器时反馈恒为 0，PID 积分会把占空比推到上限 99 — 属预期行为，非缺陷。

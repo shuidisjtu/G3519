@@ -81,7 +81,7 @@ G3519_control/
 | 编码器 | PA14(PHA0), PA15(PHB0) | `PHA0()/PHB0()` |
 | CCD 数字 | PC9(SI1), PB20(CLK1), PC4(SI2), PC5(CLK2) | `CCD_SI1/CLK1/SI2/CLK2` |
 | CCD ADC | PB18(CH5-CCD1), PB19(CH6-CCD2), PB17(CH4-CCD3), PA17(CH2-CCD4) | `CCD_ADC_INST`=ADC1 (SysConfig) |
-| 电机 PWM | PB3(CCP0), PB0(CCP2) | `MOTOR_PWM_INST`=TIMA0 |
+| 电机 PWM | PB3(CCP0), PB0(CCP2) | `MOTOR_PWM_INST`=TIMA0 (SysConfig) |
 | 电机 DIR | PB4(M1DIR), PB2(M2DIR) | `PORTB_M1DIR/M2DIR_PIN` |
 | 电源控制 | PB1(SLEEP), PA7(FAULT) | `SLEEP_HIGH/LOW`, `FAULT()` |
 | UART6 (K230) | PC11(TX), PC10(RX)，J11 排座 | `UART_K230_INST`（SysConfig 宏） |
@@ -105,9 +105,13 @@ G3519_control/
 | UART2 | UART_K230 | K230 视觉模块（BUSCLK 80MHz, 115200, PC10/PC11） |
 | ADC12 | CCD_ADC | CCD 模拟采样（ADC1, ULPCLK/8, 序列 MEM0-3→CH5/6/4/2） |
 | I2C | IMU_I2C | MPU6050 六轴 IMU（I2C0, 400kHz, PB21-SCL/PB22-SDA） |
+| PWM | MOTOR_PWM | 电机 PWM（TIMA0, 20kHz, CC0-PB3/M1, CC2-PB0/M2） |
 
-**手动初始化（不在 SysConfig 中）**：
-- **TIMA0**：电机 PWM（20kHz），在 `tsp_motor_init()` 中手动配置
+**全部外设均由 SysConfig 配置**，应用代码不再手动初始化外设寄存器。
+
+> **MOTOR_PWM 两个约定**（改 `.syscfg` 时勿动）：
+> - `timerStartTimer = false` — 计数器由 `SYSCFG_DL_init()` 配置但不启动，进电机场景时 `tsp_motor_init()` 才 `startCounter()`。改成 true 会让 PWM 开机常驻。
+> - `PWM_CHANNEL_x.ccValue = 0` — 必须显式置 0。SysConfig 在 EDGE_ALIGN 下按 `(100-duty)*period/100-1` 反算 ccValue，默认值会生成 3999，在本项目的 CC 极性约定下等于 100% 占空比。
 
 ## API 速查
 
@@ -184,18 +188,18 @@ tsp_uart_k230_rx_disable();             // 退出场景时关闭
 // ADC1 via SysConfig（实例 CCD_ADC，序列模式 MEM0-3→CH5/6/4/2）
 // VREF = VDDA (3.3V)，BUSY 轮询带超时 (10000 cycles)
 ccd_data_t pixels;                     // uint16_t[128]，注意栈占用 256B
-tsp_ccd_init();                        // ADC1 (reset+power+clock) + GPIO -> 模拟/数字引脚
+tsp_ccd_init();                        // 仅复位 SI/CLK 引脚为空闲态（ADC1 由 SysConfig 初始化）
 tsp_ccd_snapshot(CCD1, pixels);        // flush -> 曝光 -> 读 128 像素（ADC1 CH5）
 tsp_ccd_snapshot(CCD2, pixels);        // 同上，读取 MEM1 (ADC1 CH4)
 tsp_ccd_set_exposure(10);              // 曝光时间 ms (1-100, 默认 10)
 // LCD 波形绘制见 action_ccd_test(): 128px x 63px 区域，erasure-based 增量更新
 
-// ===== DRV8874 DC Motor Driver（TIMA0 手动初始化, 不在SysConfig中）=====
+// ===== DRV8874 DC Motor Driver（TIMA0 PWM 由 SysConfig 配置, 实例 MOTOR_PWM）=====
 // 硬件: PB3(CCP0=M1 PWM), PB4(GPIO=M1 DIR), PB0(CCP2=M2 PWM), PB2(GPIO=M2 DIR)
 // 控制: nSLEEP=PB1, nFAULT=PA7(10kΩ上拉, 无VBAT时也读HIGH)
-// ⚠️ initPWMMode() 设 CC OCTL = INIT_VAL_LOW (SDK默认), 不可覆盖为 INIT_VAL_HIGH
+// ⚠️ SysConfig 中 CC OCTL 必须为 INIT_VAL_LOW (默认值), 不可改为 INIT_VAL_HIGH
 // AD2: J10(M1)/J11(M2) 需VBAT; 无VBAT时接J14侧IN1/IN2看3.3V逻辑
-tsp_motor_init();                            // 初始化 TIMA0 PWM (20kHz)
+tsp_motor_init();                            // 仅启动 TIMA0 计数器 (PWM 配置由 SysConfig 完成)
 SLEEP_HIGH();                                // 使能 H 桥 (必须在 set 之前)
 tsp_motor_set(MOTOR1, MOTOR_FORWARD, 50);    // 电机1 正向 50%
 tsp_motor_set(MOTOR2, MOTOR_BACKWARD, 30);   // 电机2 反向 30% (M1/M2 独立控制)

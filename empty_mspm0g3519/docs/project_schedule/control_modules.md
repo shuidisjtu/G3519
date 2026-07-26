@@ -1,13 +1,13 @@
 # 控制题（小车题）模块实现进度
 
-> 最后更新：2026-07-25
+> 最后更新：2026-07-26
 > 覆盖场景：循迹、色块追踪、电机驱动、速度闭环、视觉导航等
 
 ## 进度总览
 
 | 模块 | 代码 | 硬件验证 | 状态 |
 |------|------|---------|------|
-| DRV8874 电机驱动 | 完整 | AD2 暂无异常 | 待实物电机验证 |
+| DRV8874 电机驱动 | 完整（已迁移 SysConfig） | AD2 暂无异常，迁移后待复测 | 待实物电机验证 |
 | K230 视觉模块 | 完整 | 双向通信已验证 | 可用 |
 | CCD 线阵（循迹） | 完整 | DC注入已验证 | 可用 |
 | 编码器（测速） | 完整 | 在用 | 可用 |
@@ -22,15 +22,30 @@
 
 - **代码文件**：`NUEDC2025/tsp_motor.c/.h`
 - **应用入口**：`action_motor_openloop()` — 双电机独立控制、正反转、占空比调节；`action_motor_closeloop()` — PID 闭环速度控制
-- **硬件配置**：
+- **硬件配置**（SysConfig 实例 `MOTOR_PWM`）：
   - TIMA0 PWM 20kHz (80MHz BUSCLK, period=3999)
   - M1: PB3(CCP0 PWM) + PB4(DIR GPIO)
   - M2: PB0(CCP2 PWM) + PB2(DIR GPIO)
   - nSLEEP: PB1，nFAULT: PA7 (10kΩ 上拉)
 - **验证状态**：2026-07-22 下午 AD2 测试 PWM 输出暂未发现异常
-- **待验证**：接实物电机后的实际驱动效果、nFAULT 故障检测、电流/堵转保护
+- **待验证**：SysConfig 迁移后 AD2 复测（见下）、接实物电机后的实际驱动效果、nFAULT 故障检测、电流/堵转保护
 - **使用注意**：调用 `tsp_motor_set()` 前必须先 `SLEEP_HIGH()` 使能 H 桥
 - **参考文档**：`development_reference/DRV8874_Motor_Use.md`
+
+#### SysConfig 迁移（2026-07-26）
+
+TIMA0 曾是唯一在应用代码里手动配置的外设，违反项目「SysConfig 先行」规则，已迁移到 `.syscfg` 的 PWM 模块。`tsp_motor_init()` 从 92 行缩为一句 `DL_TimerA_startCounter()`，`tsp_motor_set()` 逻辑未动。
+
+两个配置约定，改 `.syscfg` 时勿动：
+
+| 配置项 | 值 | 原因 |
+|---|---|---|
+| `timerStartTimer` | `false` | 计数器由 `SYSCFG_DL_init()` 配置但不启动，保持「进电机场景才启用」的原有时序。改 true 会让 PWM 开机常驻 |
+| `PWM_CHANNEL_0/2.ccValue` | `0` | **必须显式设**。SysConfig 在 EDGE_ALIGN 下按 `(100-duty)*period/100-1` 反算（`PWMTimerCC.syscfg.js:107`），留默认会生成 3999 — 在本项目 CC 极性约定下等于 100% 占空比 |
+
+> **一处未定论的极性分歧**：SysConfig 认为 EDGE_ALIGN 下 CC 值与占空比成**反比**，而项目手写代码 `tsp_motor_set()` 用的是**正比**（`cc = duty*4000/100`，与 `tsp_motor.c` 原注释及 2026-07-22 AD2 实测一致）。本次通过固定 `ccValue=0` 使复位状态与迁移前逐位相同，把极性语义完全留在 `tsp_motor_set()` 内，因此该分歧不影响行为。**若后续 AD2 复测发现占空比方向相反，问题出在这里**。
+
+已验证：IAR 构建 0 error（`tsp_motor.c` 的 4 条 Pe188 为既有警告，已用 stash 基线对比确认）；CLI 以 `--compiler iar` 重新生成与提交文件逐字节一致。提交 `fec46c1`。
 
 ### K230 视觉模块
 
