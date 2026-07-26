@@ -667,15 +667,18 @@ exit_openloop:
 static void action_motor_closeloop(void)
 {
 	uint8_t  motor_run   = 0;     /* 0=stopped, 1=running, S2 to toggle */
-	uint16_t target_speed = 200;  /* target encoder pulses/20ms */
+	uint16_t target_speed = 1000; /* target encoder pulses/20ms (wheel QEI) */
 	int16_t  current_speed;
 	int16_t  dc          = 0;     /* PWM duty cycle output (signed for bidirectional) */
 	uint16_t tick        = 0;
 	char     buf[32];
 
-	/* PID controller (incremental, D-on-PV) */
+	/* PID controller (incremental, D-on-PV)
+	 * Gains scaled down vs HSPv2 (0.2/0.02/0.06) because wheel QEI raw
+	 * counts are ~2x larger and dead-zone compression makes the usable
+	 * duty band narrower (dc 1..49 → actual 51..99%). */
 	pid_inc_t spd_pid;
-	tsp_pid_inc_init(&spd_pid, 0.2f, 0.02f, 0.06f, 0.0f, 99.0f);
+	tsp_pid_inc_init(&spd_pid, 0.05f, 0.008f, 0.02f, 0.0f, 99.0f);
 
 	/* Init subsystems */
 	tsp_motor_init();
@@ -696,7 +699,7 @@ static void action_motor_closeloop(void)
 	tsp_tft18_show_str_color(0, 4, (uint8_t *)"Duty:", CYAN, BLACK);
 	tsp_tft18_show_str_color(0, 5, (uint8_t *)"Status:", CYAN, BLACK);
 
-	tsp_tft18_show_str_color(0, 7, (uint8_t *)"S0/S1:Spd S2:Run/Stp", BLACK, GREEN);
+	tsp_tft18_show_str_color(0, 7, (uint8_t *)"Btn:+/-100 S2:RunStp", BLACK, GREEN);
 
 	/* Initial display */
 	tsp_tft18_show_uint16(72, 2, target_speed);
@@ -722,28 +725,30 @@ static void action_motor_closeloop(void)
 			}
 		}
 
-		/* S0: target speed -10 */
+		/* S0: target speed -100 */
 		if (tsp_key_pressed(KEY_S0)) {
-			if (target_speed >= 10) target_speed -= 10;
+			if (target_speed >= 100) target_speed -= 100;
 			else target_speed = 0;
 			tsp_tft18_show_uint16(72, 2, target_speed);
 		}
-		/* S1: target speed +10 */
+		/* S1: target speed +100 */
 		if (tsp_key_pressed(KEY_S1)) {
-			if (target_speed <= 490) target_speed += 10;
-			else target_speed = 500;
+			if (target_speed <= 4900) target_speed += 100;
+			else target_speed = 5000;
 			tsp_tft18_show_uint16(72, 2, target_speed);
 		}
 
-		/* Encoder: fine speed adjust ±1 (distributed from S0/S1) */
+		/* Encoder: fine speed adjust ±10 */
 		{
 			int32_t enc = tsp_encoder_get_count();
 			if (enc > 0) {
-				if (target_speed < 500) target_speed++;
+				if (target_speed <= 4990) target_speed += 10;
+				else target_speed = 5000;
 				tsp_tft18_show_uint16(72, 2, target_speed);
 				tsp_encoder_reset();
 			} else if (enc < 0) {
-				if (target_speed > 0) target_speed--;
+				if (target_speed >= 10) target_speed -= 10;
+				else target_speed = 0;
 				tsp_tft18_show_uint16(72, 2, target_speed);
 				tsp_encoder_reset();
 			}

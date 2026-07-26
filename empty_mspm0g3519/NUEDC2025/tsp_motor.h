@@ -2,19 +2,15 @@
  * @file    tsp_motor.h
  * @brief   DC Motor Driver for DRV8874 H-Bridge (PMODE=HIGH)
  *
- * Pin mapping (G3519 TIMA0 → expansion board J5 → DRV8874):
- *   Motor1: PB3(TIMA0_CCP0=PWM=IN2) + PB4(GPIO=DIR=IN1)
- *   Motor2: PB0(TIMA0_CCP2=PWM=IN2) + PB2(GPIO=DIR=IN1)
- *   nSLEEP: PB1 (shared, active HIGH) -- already defined in ti_msp_dl_config.h
- *   nFAULT: PA7 (shared, active LOW)  -- already defined in ti_msp_dl_config.h
+ * Dual-PWM 4-channel architecture (TIMA0, SysConfig instance MOTOR_PWM):
+ *   Motor1(right): PB3(CCP0=IN2) + PB4(CCP1=IN1)
+ *   Motor2(left):  PB0(CCP2=IN2) + PB2(CCP3=IN1)
+ *   nSLEEP: PB1 (shared, active HIGH)
+ *   nFAULT: PA7 (shared, active LOW, 10k pull-up)
  *
- * DRV8874 control scheme (PMODE=HIGH):
- *   Forward:  IN1=LOW,  IN2=PWM
- *   Backward: IN1=HIGH, IN2=PWM
- *   Coast:    IN1=LOW,  IN2=LOW
- *   Brake:    IN1=HIGH, IN2=HIGH
- *
- * Reference: D:\EDC26_HSPv2\Utilities\HSP_MOTOR.h
+ * Both directions use fast-decay (PWM-low = coast = IN1=L,IN2=L).
+ * Mirrored mounting: tsp_motor_set() swaps IN1/IN2 roles per motor
+ * so MOTOR_FORWARD always means vehicle forward.
  */
 
 #ifndef TSP_MOTOR_H_

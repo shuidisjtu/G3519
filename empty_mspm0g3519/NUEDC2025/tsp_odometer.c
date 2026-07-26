@@ -252,7 +252,7 @@ void tsp_odometer_demo(void)
             distance    = 0.0f;
             angle       = 0.0f;
             first_read  = 1;
-            tsp_encoder_reset();
+            tsp_wheel_enc_reset();
             last_disp_dist  = -1.0f;
             last_disp_ang   = -1.0f;
             last_disp_pulse = -1;
