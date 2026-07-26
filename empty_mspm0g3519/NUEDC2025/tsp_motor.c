@@ -20,75 +20,12 @@
 
 #include "tsp_motor.h"
 
-/* ===== TIMA0 PWM clock configuration =====
- * timerClkFreq = BUSCLK / (divideRatio * (prescale + 1))
- *   80000000 Hz = 80000000 Hz / (1 * (0 + 1))
- * PWM frequency = 80000000 / 4000 = 20000 Hz
- */
-static const DL_TimerG_ClockConfig gMotorPWMClockConfig = {
-    .clockSel    = DL_TIMER_CLOCK_BUSCLK,
-    .divideRatio = DL_TIMER_CLOCK_DIVIDE_1,
-    .prescale    = 0U
-};
-
-static const DL_TimerG_PWMConfig gMotorPWMConfig = {
-    .pwmMode           = DL_TIMER_PWM_MODE_EDGE_ALIGN,
-    .period            = MOTOR_PWM_PERIOD,
-    .isTimerWithFourCC = true,
-    .startTimer        = DL_TIMER_STOP,
-};
-
 void tsp_motor_init(void)
 {
-    /* 1. Enable TIMA0 power and reset */
-    DL_TimerG_reset(MOTOR_PWM_INST);
-    DL_TimerG_enablePower(MOTOR_PWM_INST);
-    delay_cycles(POWER_STARTUP_DELAY);
-
-    /* 2. Configure PB3 (TIMA0_CCP0) and PB0 (TIMA0_CCP2) as peripheral outputs.
-     *    PB4 and PB2 are already configured as GPIO outputs in SYSCFG_DL_GPIO_init(). */
-    DL_GPIO_initPeripheralOutputFunction(MOTOR_PWM_C0_IOMUX,
-        MOTOR_PWM_C0_IOMUX_FUNC);
-    DL_GPIO_initPeripheralOutputFunction(MOTOR_PWM_C2_IOMUX,
-        MOTOR_PWM_C2_IOMUX_FUNC);
-    DL_GPIO_enableOutput(GPIOB, DL_GPIO_PIN_3 | DL_GPIO_PIN_0);
-
-    /* 3. Set TIMA0 clock and initialize edge-aligned PWM mode */
-    DL_TimerG_setClockConfig(MOTOR_PWM_INST,
-        (DL_TimerG_ClockConfig *) &gMotorPWMClockConfig);
-    DL_TimerG_initPWMMode(MOTOR_PWM_INST,
-        (DL_TimerG_PWMConfig *) &gMotorPWMConfig);
-
-    /* 4. Set Counter zero/load/compare control to smallest CC index (CC0) */
-    DL_TimerG_setCounterControl(MOTOR_PWM_INST,
-        DL_TIMER_CZC_CCCTL0_ZCOND,
-        DL_TIMER_CAC_CCCTL0_ACOND,
-        DL_TIMER_CLC_CCCTL0_LCOND);
-
-    /* 5. Configure CC0 (PB3 = M1IN2): Motor1 PWM
-     *    EDGE_ALIGN (down-count): LACT=HIGH at LOAD, CDACT=LOW at CC match.
-     *    INIT_VAL_LOW (SDK default): CC=0 → output stays LOW (0% duty).
-     *    CC=PERIOD → output stays HIGH (100% duty). */
-    DL_TimerG_setCaptCompUpdateMethod(MOTOR_PWM_INST,
-        DL_TIMER_CC_UPDATE_METHOD_IMMEDIATE,
-        DL_TIMERG_CAPTURE_COMPARE_0_INDEX);
-    DL_TimerG_setCaptureCompareValue(MOTOR_PWM_INST, 0,
-        DL_TIMER_CC_0_INDEX);
-
-    /* 6. Configure CC2 (PB0 = M2IN2): Motor2 PWM */
-    DL_TimerG_setCaptCompUpdateMethod(MOTOR_PWM_INST,
-        DL_TIMER_CC_UPDATE_METHOD_IMMEDIATE,
-        DL_TIMERG_CAPTURE_COMPARE_2_INDEX);
-    DL_TimerG_setCaptureCompareValue(MOTOR_PWM_INST, 0,
-        DL_TIMER_CC_2_INDEX);
-
-    /* 7. Enable TIMA0 clock and set CC0/CC2 as outputs */
-    DL_TimerG_enableClock(MOTOR_PWM_INST);
-    DL_TimerG_setCCPDirection(MOTOR_PWM_INST,
-        DL_TIMER_CC0_OUTPUT | DL_TIMER_CC2_OUTPUT);
-
-    /* 8. Start PWM counter (nSLEEP controlled by caller, HSPv2: MEN_HIGH/MEN_LOW) */
-    DL_TimerG_startCounter(MOTOR_PWM_INST);
+    /* TIMA0 PWM (20kHz, CC0=PB3/M1, CC2=PB0/M2) is configured by SysConfig in
+     * SYSCFG_DL_MOTOR_PWM_init(). Counter is left stopped there so PWM only
+     * runs while a motor scene is active. */
+    DL_TimerA_startCounter(MOTOR_PWM_INST);
 }
 
 void tsp_motor_set(uint8_t motor, uint8_t dir, uint16_t duty_pct)
@@ -118,25 +55,25 @@ void tsp_motor_set(uint8_t motor, uint8_t dir, uint16_t duty_pct)
     case MOTOR_FORWARD:
         /* IN1=LOW, IN2=PWM */
         DL_GPIO_clearPins(PORTB_PORT, dir_pin);
-        DL_TimerG_setCaptureCompareValue(MOTOR_PWM_INST, cc_val, cc_index);
+        DL_TimerA_setCaptureCompareValue(MOTOR_PWM_INST, cc_val, cc_index);
         break;
 
     case MOTOR_BACKWARD:
         /* IN1=HIGH, IN2=PWM */
         DL_GPIO_setPins(PORTB_PORT, dir_pin);
-        DL_TimerG_setCaptureCompareValue(MOTOR_PWM_INST, cc_val, cc_index);
+        DL_TimerA_setCaptureCompareValue(MOTOR_PWM_INST, cc_val, cc_index);
         break;
 
     case MOTOR_COAST:
         /* IN1=LOW, IN2=0 -> Hi-Z */
         DL_GPIO_clearPins(PORTB_PORT, dir_pin);
-        DL_TimerG_setCaptureCompareValue(MOTOR_PWM_INST, 0, cc_index);
+        DL_TimerA_setCaptureCompareValue(MOTOR_PWM_INST, 0, cc_index);
         break;
 
     case MOTOR_BRAKE:
         /* IN1=HIGH, IN2=100% -> low-side brake */
         DL_GPIO_setPins(PORTB_PORT, dir_pin);
-        DL_TimerG_setCaptureCompareValue(MOTOR_PWM_INST,
+        DL_TimerA_setCaptureCompareValue(MOTOR_PWM_INST,
             MOTOR_PWM_PERIOD + 1U, cc_index);
         break;
 
@@ -164,10 +101,10 @@ uint8_t tsp_motor_fault(void)
 
 void tsp_motor_pwm_start(void)
 {
-    DL_TimerG_startCounter(MOTOR_PWM_INST);
+    DL_TimerA_startCounter(MOTOR_PWM_INST);
 }
 
 void tsp_motor_pwm_stop(void)
 {
-    DL_TimerG_stopCounter(MOTOR_PWM_INST);
+    DL_TimerA_stopCounter(MOTOR_PWM_INST);
 }

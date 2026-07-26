@@ -94,6 +94,26 @@ extern "C" {
 bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 
 
+/* Defines for MOTOR_PWM */
+#define MOTOR_PWM_INST                                                     TIMA0
+#define MOTOR_PWM_INST_IRQHandler                               TIMA0_IRQHandler
+#define MOTOR_PWM_INST_INT_IRQN                                 (TIMA0_INT_IRQn)
+#define MOTOR_PWM_INST_CLK_FREQ                                         80000000
+/* GPIO defines for channel 0 */
+#define GPIO_MOTOR_PWM_C0_PORT                                             GPIOB
+#define GPIO_MOTOR_PWM_C0_PIN                                      DL_GPIO_PIN_3
+#define GPIO_MOTOR_PWM_C0_IOMUX                                  (IOMUX_PINCM16)
+#define GPIO_MOTOR_PWM_C0_IOMUX_FUNC                 IOMUX_PINCM16_PF_TIMA0_CCP0
+#define GPIO_MOTOR_PWM_C0_IDX                                DL_TIMER_CC_0_INDEX
+/* GPIO defines for channel 2 */
+#define GPIO_MOTOR_PWM_C2_PORT                                             GPIOB
+#define GPIO_MOTOR_PWM_C2_PIN                                      DL_GPIO_PIN_0
+#define GPIO_MOTOR_PWM_C2_IOMUX                                  (IOMUX_PINCM12)
+#define GPIO_MOTOR_PWM_C2_IOMUX_FUNC                 IOMUX_PINCM12_PF_TIMA0_CCP2
+#define GPIO_MOTOR_PWM_C2_IDX                                DL_TIMER_CC_2_INDEX
+
+
+
 
 /* Defines for IMU_I2C */
 #define IMU_I2C_INST                                                        I2C0
@@ -282,6 +302,7 @@ void SYSCFG_DL_GPIO_init(void);
 void SYSCFG_DL_SYSCTL_init(void);
 
 bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
+void SYSCFG_DL_MOTOR_PWM_init(void);
 void SYSCFG_DL_IMU_I2C_init(void);
 void SYSCFG_DL_UART_0_init(void);
 void SYSCFG_DL_UART_K230_init(void);

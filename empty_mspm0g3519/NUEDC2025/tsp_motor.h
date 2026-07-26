@@ -34,24 +34,16 @@
 #define MOTOR_BRAKE      3    /* IN1=H, IN2=H -> low-side brake */
 
 /* ===== PWM parameters ===== */
+/* Must stay in sync with PWM1.timerCount in empty_mspm0g3519.syscfg */
 #define MOTOR_PWM_PERIOD    3999U   /* TIMA0 period (0..3999), 80MHz/4000=20kHz */
 #define MOTOR_DC_LIMIT      100U    /* max duty cycle percent */
-
-/* ===== TIMA0 PWM instance ===== */
-#define MOTOR_PWM_INST      TIMA0
-
-/* ===== Motor PWM pin IOMUX (PB3=TIMA0_CCP0, PB0=TIMA0_CCP2) ===== */
-#define MOTOR_PWM_C0_IOMUX       IOMUX_PINCM16
-#define MOTOR_PWM_C0_IOMUX_FUNC  IOMUX_PINCM16_PF_TIMA0_CCP0
-#define MOTOR_PWM_C2_IOMUX       IOMUX_PINCM12
-#define MOTOR_PWM_C2_IOMUX_FUNC  IOMUX_PINCM12_PF_TIMA0_CCP2
 
 /* ===== API ===== */
 
 /**
- * @brief  Initialize TIMA0 PWM and motor driver
- * @note   Call after SYSCFG_DL_init(). Configures PB3/PB0 as TIMA0 CCP outputs,
- *         initializes edge-aligned PWM at 20kHz, starts counter.
+ * @brief  Start TIMA0 PWM counter
+ * @note   Call after SYSCFG_DL_init(). SysConfig configures TIMA0 (20kHz,
+ *         CC0=PB3/M1, CC2=PB0/M2) but leaves the counter stopped.
  *         Caller must enable H-bridge via SLEEP_HIGH() before use
  *         and SLEEP_LOW() after (matching HSPv2 MEN_HIGH/MEN_LOW pattern).
  */
