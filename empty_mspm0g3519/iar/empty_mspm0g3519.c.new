@@ -70,27 +70,31 @@ static void action_dds_test(void)
 	tsp_tft18_show_str_color(0, 6, (uint8_t *)"S0/S1:Wave  Enc:Freq", GRAY1, BLACK);
 	tsp_tft18_show_str_color(0, 7, (uint8_t *)"PUSH:Exit  S2:Keep  ", GRAY1, BLACK);
 
-	/* Start DDS with encoder ISR for reliable quadrature decode */
+	/* Start DDS (polled encoder — no ISR needed) */
 	tsp_dds_set_output(freq, tsp_dds_wave_ctrl[wave_idx]);
-	tsp_encoder_enable();
 
 	{
-		int32_t last_count = 0;
-		uint8_t tick = 0;
+			uint8_t  last_state; /* 2-bit: {PHA0, PHB0} */
+			int32_t  enc_acc  = 0;
+			uint8_t  tick     = 0;
 
-		while (1) {
-			tick++;
+			last_state = ((PHA0() != 0) ? 2 : 0) | ((PHB0() != 0) ? 1 : 0);
 
-			/* --- Keys + encoder every ~10ms --- */
-			if (tick >= 10) {
-				tick = 0;
-
-				/* Read encoder delta from ISR-driven counter.
-				 * ISR yields 2 counts/detent (both PHA0 edges).
-				 * Step = 25 Hz/count → 50 Hz per detent. */
-				int32_t cur_count = tsp_encoder_get_count();
-				int32_t enc_acc   = cur_count - last_count;
-				last_count        = cur_count;
+			while (1) {
+				/* Quadrature state-machine decode at 1ms.
+				 * Only valid Gray-code transitions counted;
+				 * illegal jumps (bounce, diagonal) ignored.
+				 * Fwd: 0->2->3->1->0  Rev: 0->1->3->2->0 */
+				{
+					uint8_t s = ((PHA0() != 0) ? 2 : 0) | ((PHB0() != 0) ? 1 : 0);
+					if (s != last_state) {
+						uint8_t p = last_state; last_state = s;
+						if ((p==0&&s==2)||(p==2&&s==3)||(p==3&&s==1)||(p==1&&s==0))
+							enc_acc++;
+						else if ((p==0&&s==1)||(p==1&&s==3)||(p==3&&s==2)||(p==2&&s==0))
+							enc_acc--;
+					}
+				}
 
 				/* Keys */
 				tsp_key_scan();
@@ -104,15 +108,16 @@ static void action_dds_test(void)
 					wave_idx = (wave_idx == DDS_WAVE_COUNT - 1) ? 0 : wave_idx + 1;
 				}
 
-				/* Apply encoder accumulation.
-				 * ISR yields 2 counts/detent (both PHA0 edges).
-				 * 25 Hz/count → 50 Hz per detent. */
+				/* Apply encoder accumulation */
 				if (enc_acc != 0) {
-					int32_t new_freq = (int32_t)freq + enc_acc * 25;
+					uint32_t step = tsp_dds_get_step(freq, enc_acc);
+					int32_t  new_freq = (int32_t)freq + enc_acc * (int32_t)(step / 4);
 
 					if      (new_freq < 100)    freq = 100;
 					else if (new_freq > 50000) freq = 50000;
 					else                       freq = (uint32_t)new_freq;
+
+					enc_acc = 0;
 				}
 			}
 
@@ -164,7 +169,6 @@ static void action_dds_test(void)
 	}
 
 	/* Cleanup */
-	tsp_encoder_disable();
 	if (!keep_output)
 		tsp_dds_stop();
 	tsp_menu_request_redraw();

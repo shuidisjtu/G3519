@@ -76,13 +76,7 @@ void tsp_dds_stop(void)
 
 uint32_t tsp_dds_get_step(uint32_t freq, int32_t delta)
 {
-    uint32_t base;
-    if      (freq < 1000)  base = 10;
-    else if (freq < 10000) base = 100;
-    else                   base = 1000;   /* 10 kHz ~ 50 kHz */
-
-    /* Fast rotation: coarser step */
-    if (delta >= 3 || delta <= -3) base *= 10;
-
-    return base;
+    (void)freq;
+    (void)delta;
+    return 50;   /* 50 Hz per detent */
 }

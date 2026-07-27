@@ -27,26 +27,29 @@ void tsp_encoder_init(void)
 
 /*
  * tsp_encoder_isr — called from GROUP1_IRQHandler when PHA0 (PA14) triggers.
- * On each edge of PHA0, read PHB0 to determine direction:
- *   PHB0 HIGH on PHA0 rising  → forward  (+1)
- *   PHB0 LOW  on PHA0 rising  → reverse (−1)
- * (Or equivalently: count on all edges, direction = PHB0 ^ PHA0)
+ * Time-based debounce: ignores edges within 2ms of the previous edge.
+ * This correctly handles mechanical bounce (typically 1-5ms) without
+ * the state-tracking problems of a Gray-code state machine when the
+ * ISR only sees PHA0 edges (PHB0 transitions are invisible to it).
  */
 void tsp_encoder_isr(uint8_t dio_index)
 {
     if (dio_index != ENC_PHA0_IIDX) return;
 
-    /* Read current levels */
+    static uint32_t last_edge_tick = 0;
+    uint32_t now = sys_tick_counter;
+
+    /* Debounce: ignore edges within 2ms of previous edge */
+    if ((now - last_edge_tick) < 2) return;
+    last_edge_tick = now;
+
     uint8_t pha0 = (PHA0() != 0) ? 1 : 0;
     uint8_t phb0 = (PHB0() != 0) ? 1 : 0;
 
-    /* Quadrature decode: XNOR of PHA0 and PHB0 gives direction.
-     * PHA0 edge + PHB0=HIGH → CW/forward;  PHA0 edge + PHB0=LOW → CCW/reverse.
-     * Equivalent: if PHA0 == PHB0 → forward (+1), else reverse (−1). */
     if (pha0 == phb0) {
-        g_enc_count++;
+        g_enc_count--;               /* reverse */
     } else {
-        g_enc_count--;
+        g_enc_count++;               /* forward */
     }
 }
 
