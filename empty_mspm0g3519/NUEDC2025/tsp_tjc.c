@@ -115,7 +115,7 @@ void tsp_tjc_set_txt(const char *obj, const char *txt)
 	char buf[TJC_CMD_BUF_SIZE];
 	uint8_t p = 0;
 
-	while (*obj && p < TJC_CMD_BUF_SIZE - 6)
+	while (*obj && p < TJC_CMD_BUF_SIZE - 7)
 		buf[p++] = *obj++;
 	buf[p++] = '.'; buf[p++] = 't'; buf[p++] = 'x'; buf[p++] = 't';
 	buf[p++] = '='; buf[p++] = '"';
@@ -173,6 +173,7 @@ uint8_t tsp_tjc_addt(const char *obj, uint8_t ch,
 	buf[p] = '\0';
 
 	tsp_uart6_flush_rx();
+	rx_state = TJC_RX_IDLE;
 	tsp_tjc_cmd(buf);
 
 	if (!tjc_wait_byte(0xFE, TJC_ADDT_TIMEOUT_MS))
@@ -180,8 +181,7 @@ uint8_t tsp_tjc_addt(const char *obj, uint8_t ch,
 
 	tsp_uart6_send_bytes(data, len);
 
-	tjc_wait_byte(0xFD, TJC_ADDT_TIMEOUT_MS);
-	return 1;
+	return tjc_wait_byte(0xFD, TJC_ADDT_TIMEOUT_MS);
 }
 
 /* ─── Event polling (0x65 frame state machine) ─── */
@@ -254,7 +254,15 @@ uint8_t tsp_tjc_poll(tjc_event_t *evt)
 					}
 				}
 			} else {
-				rx_state = TJC_RX_IDLE;
+				rx_head = b;
+				if (b < 0x90 && frame_body_len[b] > 0) {
+					rx_body_idx = 0;
+					rx_skip_count = frame_body_len[b];
+					rx_state = TJC_RX_BODY;
+				} else {
+					rx_state = TJC_RX_TAIL;
+					rx_tail_idx = 0;
+				}
 			}
 			break;
 
