@@ -33,12 +33,14 @@ empty_mspm0g3519/
 │   ├── tsp_gpio.h/.c                  ← GPIO 宏（LED/蜂鸣器/LCD/按键/编码器/DDS）
 │   ├── TSP_TFT18.h/.c                 ← TFT LCD 驱动（ST7735, 160×128, SPI1）
 │   └── tsp_menu.h/.c                  ← LCD 菜单系统（列表+子菜单+增量重绘）
+├── TJC4827X543_011/                   ← TJC 串口屏工程
+│   └── TJC4827X543.HMI                ← USART HMI 工程文件（480×272, X5 系列）
 ├── NUEDC2025/                         ← 应用层驱动
 │   ├── tsp_isr.h/.c                   ← SysTick 延时 + GROUP1/UART0/UART6 中断分发
 │   ├── tsp_key.h/.c                   ← 4 键扫描（20ms 消抖，边沿检测）
 │   ├── tsp_encoder.h/.c               ← 编码器（PHA0 中断正交解码，20ms 速度）
 │   ├── tsp_uart.h/.c                  ← UART0（MFCLK 4MHz, 115200-8N1, 超时 TX, 环形缓冲 RX）
-│   ├── tsp_uart6.h/.c                 ← UART6（BUSCLK 80MHz, J11 K230, 超时 TX, 环形缓冲 RX）
+│   ├── tsp_uart6.h/.c                 ← UART6（BUSCLK 80MHz, J11 TJC 屏/K230, 超时 TX, 环形缓冲 RX）
 │   ├── tsp_cmd.h/.c                   ← 文本命令协议（VER?/ADC/FREQ/DDS/FFT）
 │   ├── tsp_ad5933.h/.c                ← AD5933 阻抗测量（I2C1, 100kHz, 温度+扫频）
 │   ├── tsp_dds.h/.c                   ← AD9833 DDS 波形发生器（GPIO bit-bang, 方波/正弦/三角波）
@@ -47,7 +49,7 @@ empty_mspm0g3519/
 │   ├── tsp_scope.h/.c                 ← Scope 波形显示（160×96px, 自动量程, 差分更新, 触发）
 │   └── tsp_ad8302.h/.c                ← [封存] AD8302 幅相检测（需 RF 信号，输入网络未焊）
 └── docs/                              ← 硬件文档与项目进度
-    ├── development_reference/         ← 开发参考文档
+    ├── development_reference/         ← 开发参考文档（含 TJC 屏接入/UI 规格）
     └── project_schedule/              ← 项目进度跟踪
 ```
 
@@ -73,7 +75,7 @@ empty_mspm0g3519/
 | AD5933 (I2C1) | PA29(SCL), PA30(SDA) | `I2C_AD5933_INST`（SysConfig 宏） |
 | DDS GPIO | PC2(SCLK), PC3(SDATA), PC24(FSYNC) | `DDS_SCLK/SDATA/FSYNC` |
 | UART0 | PA10(TX), PA11(RX) | IOMUX_PINCM21/22 |
-| UART6 (K230) | PC11(TX), PC10(RX) | J11, IOMUX_PINCM87/88 |
+| UART6 (TJC/K230) | PC11(TX), PC10(RX) | J11, IOMUX_PINCM87/88 |
 | ADC0 (J2) | PA25(VIN1/CH2), PA24(VIN3/CH3), PB24(VIN4/CH5) | `ADC12_0_INST` |
 | ADC1 (J2) | PB23(VIN2/CH11), PA23(VIN5/CH12) | `ADC12_1_INST` |
 
@@ -91,7 +93,7 @@ empty_mspm0g3519/
 | GPIO3 | PORTC | 4 引脚：S1(PC0), DDS_SCLK(PC2), DDS_SDATA(PC3), DDS_FSYNC(PC24) |
 | SPI1 | LCD | ST7735 LCD, BUSCLK, 10MHz, MOTO3 |
 | UART1 | UART_0 | UART0, MFCLK 4MHz, PA10(TX)/PA11(RX) |
-| UART2 | UART_K230 | UART6, BUSCLK 80MHz, PC11(TX)/PC10(RX), J11 |
+| UART2 | UART_K230 | UART6, BUSCLK 80MHz, PC11(TX)/PC10(RX), J11（TJC 屏/K230） |
 | I2C1 | I2C_AD5933 | AD5933, 100kHz Controller, PA29(SCL)/PA30(SDA) |
 | ADC12 | ADC12_0 | ADC0, ULPCLK 40MHz, 2.5μs 采样, PA25(CH2), 轮询模式 |
 | ADC12 | ADC12_1 | ADC1, ULPCLK 40MHz, 2.5μs 采样, PB23(CH11), 轮询模式 |
@@ -147,10 +149,12 @@ tsp_uart_send_string("hello\r\n");
 printf("val=%d\n", x);                 // 已重定向到 UART0（__write → 超时 TX）
 // TX 已加 10ms 超时：脱机（不接 DAPLink）时静默失败，MCU 不卡死
 
-// ===== UART6 K230（tsp_uart6.c，BUSCLK 80MHz，J11） =====
+// ===== UART6 K230/TJC（tsp_uart6.c，BUSCLK 80MHz，J11） =====
 tsp_uart6_init(115200);                 // 波特率 + NVIC + 环形缓冲
 tsp_uart6_rx_enable();
 tsp_uart6_send_string("hello\r\n");
+// TJC 屏：PC10(RX) 非 5V 耐受，屏 TX→MCU RX 需 5V→3.3V 电平转换（10kΩ/20kΩ 分压）
+// 详见 docs/TJC4827X543_011C_Use.md
 
 // ===== 文本命令协议（tsp_cmd.c） =====
 tsp_cmd_init(tsp_uart_send_string, tsp_uart_read_byte, tsp_uart_available);
