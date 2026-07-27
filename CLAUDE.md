@@ -47,6 +47,7 @@ empty_mspm0g3519/
 │   ├── tsp_adc.h/.c                   ← 通用 ADC（J2 五路, ADC0+ADC1, 电压/频率/burst 采样）
 │   ├── tsp_fft.h/.c                   ← FFT 频谱分析（CMSIS-DSP Q15, 256 点, 频率/幅值/THD/相位）
 │   ├── tsp_scope.h/.c                 ← Scope 波形显示（160×96px, 自动量程, 差分更新, 触发）
+│   ├── tsp_tjc.h/.c                   ← TJC 串口屏驱动（命令封装 + 事件解析 + addt 波形透传）
 │   └── tsp_ad8302.h/.c                ← [封存] AD8302 幅相检测（需 RF 信号，输入网络未焊）
 └── docs/                              ← 硬件文档与项目进度
     ├── development_reference/         ← 开发参考文档（含 TJC 屏接入/UI 规格）
@@ -235,6 +236,18 @@ tsp_scope_vline(x, y0, y1, color);           // 快速垂直线（bulk SPI，用
 // 相位显示: "Phase (deg)" ±180° Y 轴, 0°/±90° 网格线
 // 网格: 水平 25%/50%/75% + 垂直频率标记 (200/500/1k/2k/5k/10k/20kHz, "1k"/"10k" 标签)
 // Sweep 交互: S0/S1 切换通道（Cal 后锁定）, S2 循环 Cal→Meas→切换增益/相位, PUSH 退出/中止（中止保留 Cal 数据）
+
+// ===== TJC 串口屏驱动（tsp_tjc.c/.h，UART6 J11，协议层） =====
+tsp_tjc_init(9600);                          // 初始化 UART6 + RX 使能（首次联调用 9600）
+tsp_tjc_page(1);                             // 页面跳转: page 1
+tsp_tjc_set_val("n0", 1234);                 // 数字框更新: n0.val=1234
+tsp_tjc_set_txt("t0", "Hello");              // 文本框更新: t0.txt="Hello"
+tsp_tjc_vis("s1", 0);                        // 控件可见性: vis s1,0
+tsp_tjc_cmd("cle s0.id,0");                  // 任意命令（自动追加 FF FF FF）
+uint8_t ok = tsp_tjc_addt("s0", 0, data, 100);  // 波形透传: addt + 0xFE 握手 + 发数据 + 0xFD
+tjc_event_t evt;
+if (tsp_tjc_poll(&evt)) { /* evt.page_id, evt.comp_id, evt.event */ }  // 解析按钮事件 0x65
+// 屏 TX 约 5V，PC10 需 5V→3.3V 分压（10kΩ/20kΩ）。详见 docs/TJC4827X543_011C_Use.md
 ```
 
 ## IAR 关键路径

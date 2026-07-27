@@ -12,6 +12,7 @@
 #include "tsp_cmd.h"
 #include "tsp_scope.h"
 #include "tsp_fft.h"
+#include "tsp_tjc.h"
 #include <math.h>
 
 /* ===== Global state ===== */
@@ -1130,11 +1131,23 @@ int main(void)
 	tsp_uart_rx_enable();
 	tsp_cmd_init(tsp_uart_send_string, tsp_uart_read_byte, tsp_uart_available);
 
+	/* UART6 → TJC serial screen (J11), 9600 for first-time debug */
+	tsp_tjc_init(9600);
+
 	tsp_menu_init("== Signal 2026 ==", main_menu, MAIN_MENU_COUNT);
 
 	while (1) {
 		tsp_key_scan();
 		tsp_cmd_poll();
+
+		{
+			tjc_event_t tjc_evt;
+			if (tsp_tjc_poll(&tjc_evt)) {
+				printf("TJC: p%d c%d e%d\n",
+				       tjc_evt.page_id, tjc_evt.comp_id, tjc_evt.event);
+			}
+		}
+
 		tsp_menu_run();
 		delay_1ms(10);
 	}
