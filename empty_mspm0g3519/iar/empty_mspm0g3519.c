@@ -13,6 +13,7 @@
 #include "tsp_scope.h"
 #include "tsp_fft.h"
 #include "tsp_tjc.h"
+#include "tsp_mcp41010.h"
 #include <math.h>
 
 /* ===== Global state ===== */
@@ -341,8 +342,7 @@ static void action_ad5933_test(void)
 	float mag;
 	float gain_factor = 0.0f;
 	float cal_mag_saved = 0.0f;
-
-	#define CAL_RESISTANCE  220.0f
+	const float cal_resistance = 300000.0f;
 
 	tsp_tft18_clear(BLACK);
 	tsp_tft18_show_str_color(0, 0, (uint8_t *)"AD5933 Impedance", YELLOW, BLUE);
@@ -366,7 +366,7 @@ static void action_ad5933_test(void)
 	}
 
 	/* ===== Calibration phase ===== */
-	tsp_tft18_show_str_color(0, 3, (uint8_t *)"Cal: 220 Ohm  ", CYAN, BLACK);
+	tsp_tft18_show_str_color(0, 3, (uint8_t *)"Cal: 300K Ohm ", CYAN, BLACK);
 	tsp_tft18_show_str_color(0, 4, (uint8_t *)"Connect Rcal to J15", WHITE, BLACK);
 	tsp_tft18_show_str_color(0, 5, (uint8_t *)"S2=Calibrate", GRAY1, BLACK);
 
@@ -383,22 +383,39 @@ static void action_ad5933_test(void)
 	tsp_ad5933_set_sweep(1000, 0, 0, 100, AD5933_SETTLE_X1);
 	tsp_ad5933_start_sweep();
 
-	/* Wait for DFT data valid */
+	/* 4-sample average calibration (per reference design) */
 	{
-		uint32_t timeout = 50000;
-		while (!(tsp_ad5933_read_status() & AD5933_STATUS_DATA_VALID) && --timeout)
-			;
-	}
+		float mag_sum = 0.0f;
+		uint8_t n;
+		uint8_t valid_count = 0;
 
-	{
-		int16_t cal_real = tsp_ad5933_read_real();
-		int16_t cal_imag = tsp_ad5933_read_imag();
-		float cal_mag = sqrtf((float)cal_real * cal_real +
-							  (float)cal_imag * cal_imag);
+		for (n = 0; n < 4; n++) {
+			uint32_t timeout;
 
-		if (cal_mag > 1.0f) {
-			gain_factor = 1.0f / (CAL_RESISTANCE * cal_mag);
-			cal_mag_saved = cal_mag;
+			if (n > 0) {
+				tsp_ad5933_write_reg(AD5933_REG_CTRL_H,
+					(uint8_t)((AD5933_CTRL_REPEAT_FREQ | AD5933_VOLT_2000MV | AD5933_PGA_X1) >> 8));
+			}
+
+			timeout = 50000;
+			while (!(tsp_ad5933_read_status() & AD5933_STATUS_DATA_VALID) && --timeout)
+				;
+			if (!timeout) continue;
+
+			{
+				int16_t r = tsp_ad5933_read_real();
+				int16_t im = tsp_ad5933_read_imag();
+				mag_sum += sqrtf((float)r * r + (float)im * im);
+				valid_count++;
+			}
+		}
+
+		{
+			float cal_mag = (valid_count > 0) ? (mag_sum / valid_count) : 0.0f;
+			if (cal_mag > 1.0f) {
+				gain_factor = 1.0f / (cal_resistance * cal_mag);
+				cal_mag_saved = cal_mag;
+			}
 		}
 	}
 
@@ -481,7 +498,7 @@ static void action_ad5933_test(void)
 			/* Display Real */
 			{
 				char buf[14]; uint8_t p = 0;
-				int16_t abs_v = (real < 0) ? -real : real;
+				uint16_t abs_v = (real < 0) ? (uint16_t)(-(int32_t)real) : (uint16_t)real;
 				if (real < 0) buf[p++] = '-';
 				buf[p++] = '0' + (abs_v / 10000) % 10;
 				buf[p++] = '0' + (abs_v / 1000) % 10;
@@ -494,7 +511,7 @@ static void action_ad5933_test(void)
 			/* Display Imag */
 			{
 				char buf[14]; uint8_t p = 0;
-				int16_t abs_v = (imag < 0) ? -imag : imag;
+				uint16_t abs_v = (imag < 0) ? (uint16_t)(-(int32_t)imag) : (uint16_t)imag;
 				if (imag < 0) buf[p++] = '-';
 				buf[p++] = '0' + (abs_v / 10000) % 10;
 				buf[p++] = '0' + (abs_v / 1000) % 10;
@@ -536,7 +553,7 @@ static void action_ad5933_test(void)
 			 * REPEAT_FREQ re-runs DFT without re-initializing the DDS,
 			 * per AD5933 datasheet Figure 27. */
 			tsp_ad5933_write_reg(AD5933_REG_CTRL_H,
-				(uint8_t)((AD5933_CTRL_REPEAT_FREQ | AD5933_VOLT_200MV | AD5933_PGA_X1) >> 8));
+				(uint8_t)((AD5933_CTRL_REPEAT_FREQ | AD5933_VOLT_2000MV | AD5933_PGA_X1) >> 8));
 			tsp_ad5933_write_reg(AD5933_REG_CTRL_L, AD5933_CLK_EXTERNAL);
 		}
 	}
@@ -1098,6 +1115,79 @@ static void action_sweep_test(void)
 	tsp_menu_request_redraw();
 }
 
+/* ===== PGA Test (MCP41010 + AD620) ===== */
+
+static void action_pga_test(void)
+{
+	int16_t  pga_data = 127;
+	int16_t  last_data = -1;
+
+	tsp_pga_init();
+	tsp_encoder_enable();
+
+	tsp_tft18_clear(BLACK);
+	tsp_tft18_show_str_color(0, 0, (uint8_t *)"PGA Test  [AD620]   ", YELLOW, BLUE);
+	tsp_tft18_draw_line_h(0, 16, 160, BLUE);
+	tsp_tft18_show_str_color(0, 7, (uint8_t *)"Encoder:G  PUSH:Exit", GRAY1, BLACK);
+
+	while (1) {
+		tsp_key_scan();
+		if (tsp_key_pressed(KEY_PUSH)) break;
+
+		{
+			int32_t delta = tsp_encoder_get_count();
+			if (delta) {
+				tsp_encoder_reset();
+				pga_data += delta;
+				if (pga_data < 1)   pga_data = 1;
+				if (pga_data > 255) pga_data = 255;
+			}
+		}
+
+		if (pga_data != last_data) {
+			uint32_t rg, gain_x10;
+			char buf[21];
+			uint8_t p;
+
+			tsp_pga_set((uint8_t)pga_data);
+
+			rg = (uint32_t)pga_data * 391 + 52;
+			gain_x10 = 10 + (494000 + rg / 2) / rg;
+
+			/* Row 2: data value */
+			p = 0;
+			buf[p++] = 'D'; buf[p++] = 'a'; buf[p++] = 't';
+			buf[p++] = 'a'; buf[p++] = ':'; buf[p++] = ' ';
+			fmt_uint16(buf, &p, (uint16_t)pga_data, 3);
+			buf[p++] = ' '; buf[p++] = ' ';
+			buf[p++] = 'R'; buf[p++] = 'g'; buf[p++] = '=';
+			fmt_uint32(buf, &p, rg, 6);
+			while (p < 20) buf[p++] = ' ';
+			buf[20] = '\0';
+			tsp_tft18_show_str_color(0, 2, (uint8_t *)buf, WHITE, BLACK);
+
+			/* Row 4: gain */
+			p = 0;
+			buf[p++] = 'G'; buf[p++] = 'a'; buf[p++] = 'i';
+			buf[p++] = 'n'; buf[p++] = ':'; buf[p++] = ' ';
+			fmt_uint16(buf, &p, (uint16_t)(gain_x10 / 10), 4);
+			buf[p++] = '.';
+			buf[p++] = '0' + (gain_x10 % 10);
+			buf[p++] = 'x';
+			while (p < 20) buf[p++] = ' ';
+			buf[20] = '\0';
+			tsp_tft18_show_str_color(0, 4, (uint8_t *)buf, GREEN, BLACK);
+
+			last_data = pga_data;
+		}
+
+		delay_1ms(10);
+	}
+
+	tsp_encoder_disable();
+	tsp_menu_request_redraw();
+}
+
 /* ===== Main Menu ===== */
 
 static tsp_menu_item_t main_menu[] = {
@@ -1106,6 +1196,7 @@ static tsp_menu_item_t main_menu[] = {
 	{"ADC Test",       action_adc_test},
 	{"Scope",          action_scope_test},
 	{"Sweep",          action_sweep_test},
+	{"PGA Test",       action_pga_test},
 };
 
 #define MAIN_MENU_COUNT  (sizeof(main_menu) / sizeof(main_menu[0]))

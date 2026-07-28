@@ -13,6 +13,7 @@
 | **ADC Test** | 通用 ADC 五路采集（J2 VIN1~VIN5 电压显示 + 频率测量 + 通道切换） |
 | **Scope** | LCD 波形显示器（三档时基、上升沿触发、自动量程、差分更新无闪烁） |
 | **Sweep** | 扫频分析仪（DDS+ADC 联动 Cal/Meas/View 三阶段：校准→测量→增益/相位曲线） |
+| **PGA Test** | MCP41010 数字电位器程控 AD620 增益（GPIO bit-bang SPI, 编码器调节） |
 
 按键角色：**S0**=上移、**S1**=下移、**S2**=确认、**PUSH**=返回
 
@@ -34,8 +35,8 @@
 ### AD5933 阻抗分析仪
 
 - I2C1 接口（PA29-SCL, PA30-SDA），100kHz
-- 支持温度读取、扫频测量、GainFactor 标定
-- 硬件阻断：R31 换 20kΩ 或 R36 换 100Ω（详见 Debug_Report.md）
+- 支持温度读取、扫频测量、GainFactor 标定（4 次平均，300KΩ 标定电阻）
+- 激励 2Vpp，RFB=20KΩ，对标参考设计（需换 RFB 后验证）
 - 详见 [`docs/development_reference/AD5933_Use.md`](empty_mspm0g3519/docs/development_reference/AD5933_Use.md)
 
 ### AD9833 DDS 波形发生器
@@ -122,7 +123,7 @@
 
 | 问题 | 现象 | 解决 |
 |------|------|------|
-| **AD5933 标定失败** | GainFactor 标定阻抗值异常 | R31 换 20kΩ 或 R36 换 100Ω（详见 Debug_Report.md） |
+| **AD5933 待验证** | 已对标参考设计（2Vpp + 300KΩ标定 + 4次平均） | 需换 RFB=20KΩ 后验证 |
 | PHA0 编码器噪声 | 未接编码器时光标抖动 | 已在 `tsp_encoder_init` 中默认禁用 PHA0 中断 |
 | Flash loader Device ID 不匹配 | DAPLink 烧录失败 | 按上文步骤 2 修复 Flash loader |
 | 设备锁定警告 | 首次下载弹出 "Device is locked" | 点 Yes/OK 执行 Mass Erase |

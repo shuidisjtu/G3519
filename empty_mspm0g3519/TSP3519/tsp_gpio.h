@@ -63,4 +63,12 @@
 #define M2DIR_HIGH()       DL_GPIO_setPins(PORTB_PORT, PORTB_M2DIR_PIN)
 #define M2DIR_LOW()        DL_GPIO_clearPins(PORTB_PORT, PORTB_M2DIR_PIN)
 
+/* MCP41010 digital potentiometer bit-bang SPI (J2 pin6-8: PC25/PC26/PC27) */
+#define PGA_CS_LOW()       DL_GPIO_clearPins(GPIOC, DL_GPIO_PIN_25)
+#define PGA_CS_HIGH()      DL_GPIO_setPins(GPIOC, DL_GPIO_PIN_25)
+#define PGA_SCK_LOW()      DL_GPIO_clearPins(GPIOC, DL_GPIO_PIN_26)
+#define PGA_SCK_HIGH()     DL_GPIO_setPins(GPIOC, DL_GPIO_PIN_26)
+#define PGA_SI_LOW()       DL_GPIO_clearPins(GPIOC, DL_GPIO_PIN_27)
+#define PGA_SI_HIGH()      DL_GPIO_setPins(GPIOC, DL_GPIO_PIN_27)
+
 #endif

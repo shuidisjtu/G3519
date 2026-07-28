@@ -1177,6 +1177,12 @@
             <name>$PROJ_DIR$\..\NUEDC2025\tsp_dds.h</name>
         </file>
         <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_mcp41010.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_mcp41010.h</name>
+        </file>
+        <file>
             <name>$PROJ_DIR$\..\NUEDC2025\tsp_adc.c</name>
         </file>
         <file>

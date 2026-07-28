@@ -49,6 +49,7 @@ empty_mspm0g3519/
 │   ├── tsp_fft.h/.c                   ← FFT 频谱分析（CMSIS-DSP Q15, 256 点, 频率/幅值/THD/相位）
 │   ├── tsp_scope.h/.c                 ← Scope 波形显示（160×96px, 自动量程, 差分更新, 触发）
 │   ├── tsp_tjc.h/.c                   ← TJC 串口屏驱动（命令封装 + 事件解析 + addt 波形透传）
+│   ├── tsp_mcp41010.h/.c              ← MCP41010 数字电位器（GPIO bit-bang SPI, 程控 AD620 增益）
 │   └── tsp_ad8302.h/.c                ← [封存] AD8302 幅相检测（需 RF 信号，输入网络未焊）
 └── docs/                              ← 硬件文档与项目进度
     ├── development_reference/         ← 开发参考文档（含 TJC 屏接入/UI 规格）
@@ -76,6 +77,7 @@ empty_mspm0g3519/
 | 编码器 | PA14(PHA0), PA15(PHB0) | `PHA0()/PHB0()` |
 | AD5933 (I2C1) | PA29(SCL), PA30(SDA) | `I2C_AD5933_INST`（SysConfig 宏） |
 | DDS GPIO | PC2(SCLK), PC3(SDATA), PC24(FSYNC) | `DDS_SCLK/SDATA/FSYNC` |
+| MCP41010 GPIO | PC25(CS), PC26(SCK), PC27(SI) | `PGA_CS/SCK/SI`, J2 pin6-8 |
 | UART0 | PA10(TX), PA11(RX) | IOMUX_PINCM21/22 |
 | UART3 (TJC 屏) | PC6(TX), PC7(RX) | J4, IOMUX_PINCM78/79 |
 | UART6 (K230) | PC11(TX), PC10(RX) | J11, IOMUX_PINCM87/88 |
@@ -114,7 +116,7 @@ tsp_key_init();                        // 按键
 tsp_uart_init(115200);                 // UART0（TX 已加 10ms 超时，脱机安全）
 tsp_uart_rx_enable();                  // 开启 RX 中断
 tsp_cmd_init(tsp_uart_send_string, tsp_uart_read_byte, tsp_uart_available); // 命令协议
-tsp_menu_init(title, items, count);    // 菜单（AD5933 Test, DDS Test, ADC Test, Scope, Sweep）
+tsp_menu_init(title, items, count);    // 菜单（AD5933 Test, DDS Test, ADC Test, Scope, Sweep, PGA Test）
 
 // ===== GPIO 宏（tsp_gpio.h） =====
 LED_ON(); LED_OFF(); LED_TOGGLE();
@@ -174,7 +176,7 @@ tsp_cmd_poll();                         // 主循环中调用，解析 RX 缓冲
 // FFT,<1-5>[,FAST|MED|SLOW] → OK,<freq_x10>,<amp_mv>,<thd_x10>,<dc_mv>,<fs_hz>
 
 // ===== AD5933 Impedance Analyzer（I2C1，详见 docs/AD5933_Use.md）=====
-tsp_ad5933_init();                           // 复位 + 外部时钟 + 待机
+tsp_ad5933_init();                           // Power-down + 外部时钟 + 待机
 float temp = tsp_ad5933_read_temperature();  // 读温度（°C），500ms 超时返回 NAN
 if (temp != temp) { /* NAN → 超时，显示错误 */ }  // NaN 自检（不依赖 math.h）
 tsp_ad5933_set_sweep(start, delta, n, cyc, mult); // 配置扫频参数
@@ -182,8 +184,9 @@ tsp_ad5933_start_sweep();                    // 启动扫频
 int16_t re = tsp_ad5933_read_real();         // 读实部
 int16_t im = tsp_ad5933_read_imag();         // 读虚部
 // GainFactor 标定（应用层逻辑，已在 action_ad5933_test 中实现）：
-//   1. 接已知 R_cal → start_sweep → 等 DATA_VALID → 读 Real/Imag
-//   2. GF = 1 / (R_cal × sqrt(R² + I²))
+//   激励 2Vpp，RFB=20KΩ，标定电阻 300KΩ（cal_resistance 局部常量）
+//   1. 接 R_cal → start_sweep → 4 次 REPEAT_FREQ 采样（超时跳过），有效样本取平均 Mag
+//   2. GF = 1 / (R_cal × Mag_avg)
 //   3. 测未知：Z = 1 / (GF × sqrt(R² + I²))
 //   4. 每次读完发 REPEAT_FREQ 触发重新测量（单频点模式）
 
@@ -242,6 +245,13 @@ tsp_scope_vline(x, y0, y1, color);           // 快速垂直线（bulk SPI，用
 // 相位显示: "Phase (deg)" ±180° Y 轴, 0°/±90° 网格线
 // 网格: 水平 25%/50%/75% + 垂直频率标记 (200/500/1k/2k/5k/10k/20kHz, "1k"/"10k" 标签)
 // Sweep 交互: S0/S1 切换通道（Cal 后锁定）, S2 循环 Cal→Meas→切换增益/相位, PUSH 退出/中止（中止保留 Cal 数据）
+
+// ===== MCP41010 程控增益（tsp_mcp41010.c/.h，GPIO bit-bang SPI） =====
+tsp_pga_init();                              // GPIO 初始化（PC25/26/27 输出）
+tsp_pga_set(127);                            // 设置电位器值 0~255（Rg = data×391+52 Ω）
+tsp_pga_set_gain(20);                        // 设置目标增益 ×10 单位（20 = 2.0x, uint16_t 最大 6553.5x）
+// AD620: G = 1 + 49.4kΩ/Rg，MCP41010 100kΩ 256 步
+// PGA Test 交互: 编码器调 data, PUSH 退出
 
 // ===== TJC 串口屏驱动（tsp_tjc.c/.h，UART3 J4，协议层） =====
 tsp_tjc_init(115200);                        // 初始化 UART3 + RX 使能

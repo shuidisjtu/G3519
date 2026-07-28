@@ -216,33 +216,39 @@ void tsp_ad5933_set_sweep(uint32_t start_hz, uint32_t delta_hz,
 /* --- Initialize AD5933: reset, set external clock, standby --- */
 void tsp_ad5933_init(void)
 {
-    /* Reset: write to CTRL_L with RESET bit (clears automatically) */
-    tsp_ad5933_write_reg(AD5933_REG_CTRL_L, AD5933_RESET);
-
-    /* Settle after reset */
+    /* Power-down first for clean start (per reference design) */
+    tsp_ad5933_write_reg(AD5933_REG_CTRL_H,
+        (uint8_t)((AD5933_CTRL_POWER_DOWN | AD5933_VOLT_2000MV | AD5933_PGA_X1) >> 8));
     ad5933_delay_cycles(800000);  /* ~10ms */
 
-    /* Set external clock (MCLK = X2 16MHz), standby mode */
+    /* Standby mode with external clock */
     tsp_ad5933_write_reg(AD5933_REG_CTRL_H,
-        (uint8_t)((AD5933_CTRL_STANDBY | AD5933_VOLT_200MV | AD5933_PGA_X1) >> 8));
+        (uint8_t)((AD5933_CTRL_STANDBY | AD5933_VOLT_2000MV | AD5933_PGA_X1) >> 8));
     tsp_ad5933_write_reg(AD5933_REG_CTRL_L, AD5933_CLK_EXTERNAL);
 }
 
 /* --- Start frequency sweep --- */
 void tsp_ad5933_start_sweep(void)
 {
-    /* Initialize with start frequency */
+    /* Standby -> Reset -> Clear -> Init -> Start (per reference design) */
     tsp_ad5933_write_reg(AD5933_REG_CTRL_H,
-        (uint8_t)((AD5933_CTRL_INIT_FREQ | AD5933_VOLT_200MV | AD5933_PGA_X1) >> 8));
+        (uint8_t)((AD5933_CTRL_STANDBY | AD5933_VOLT_2000MV | AD5933_PGA_X1) >> 8));
+
+    /* Reset state machine (registers preserved), keep ext clock */
+    tsp_ad5933_write_reg(AD5933_REG_CTRL_L,
+        (uint8_t)(AD5933_RESET | AD5933_CLK_EXTERNAL));
     tsp_ad5933_write_reg(AD5933_REG_CTRL_L, AD5933_CLK_EXTERNAL);
 
-    /* Wait for initialization to complete (status bit?) */
-    ad5933_delay_cycles(800000);  /* ~10ms */
+    /* Initialize with start frequency */
+    tsp_ad5933_write_reg(AD5933_REG_CTRL_H,
+        (uint8_t)((AD5933_CTRL_INIT_FREQ | AD5933_VOLT_2000MV | AD5933_PGA_X1) >> 8));
+
+    /* Allow output to settle */
+    ad5933_delay_cycles(1600000);  /* ~20ms */
 
     /* Start sweep */
     tsp_ad5933_write_reg(AD5933_REG_CTRL_H,
-        (uint8_t)((AD5933_CTRL_START_SWEEP | AD5933_VOLT_200MV | AD5933_PGA_X1) >> 8));
-    tsp_ad5933_write_reg(AD5933_REG_CTRL_L, AD5933_CLK_EXTERNAL);
+        (uint8_t)((AD5933_CTRL_START_SWEEP | AD5933_VOLT_2000MV | AD5933_PGA_X1) >> 8));
 }
 
 /* --- Read 16-bit real value (two's complement) --- */

@@ -98,7 +98,7 @@ VIN  ←──│ U6A(跨阻) ←── J15-4            │←── 待测阻�
 │AD5933 Impedance      │ ← Row 0
 │C: B3 08              │ ← Row 1 (CTRL 回读)
 │                      │ ← Row 2
-│Cal: 220 Ohm          │ ← Row 3, CYAN (校准电阻值)
+│Cal: 300K Ohm         │ ← Row 3, CYAN (校准电阻值)
 │Connect Rcal to J15   │ ← Row 4
 │S2=Calibrate          │ ← Row 5
 │                      │
@@ -106,9 +106,9 @@ VIN  ←──│ U6A(跨阻) ←── J15-4            │←── 待测阻�
 └──────────────────────┘
 ```
 
-**操作**：在 J15-4/5 之间接入 **220Ω** 校准电阻，按 `S2` 开始标定。标定成功后显示 "Cal OK! Replace DUT"，再按 `S2` 进入测量。
+**操作**：在 J15-4/5 之间接入 **300KΩ** 校准电阻，按 `S2` 开始标定。标定过程使用 4 次 REPEAT_FREQ 采样（超时自动跳过），有效样本取平均以降低噪声。标定成功后显示 "Cal OK! Replace DUT"，再按 `S2` 进入测量。
 
-> 校准电阻值在代码中定义为 `CAL_RESISTANCE = 220.0f`，可根据手头电阻修改。
+> 校准电阻值在代码中定义为 `cal_resistance = 300000.0f`（局部常量），可根据手头电阻修改。需与 RFB (R37=20KΩ) 及待测阻抗在同一数量级。
 
 #### 阶段 2：实时测量
 
@@ -120,7 +120,7 @@ VIN  ←──│ U6A(跨阻) ←── J15-4            │←── 待测阻�
 │Freq: 1000 Hz         │ ← Row 3, WHITE
 │Real: -16857          │ ← Row 4, WHITE (每次刷新)
 │Imag: -21896          │ ← Row 5, WHITE (每次刷新)
-│Z   : 00220 Ohm       │ ← Row 6, GREEN (阻抗值)
+│Z   : XXXXX Ohm       │ ← Row 6, GREEN (阻抗值)
 │PUSH to exit          │ ← Row 7, GRAY
 └──────────────────────┘
 ```
@@ -128,12 +128,12 @@ VIN  ←──│ U6A(跨阻) ←── J15-4            │←── 待测阻�
 每次 DFT 完成后自动发送 `REPEAT_FREQ` 命令重新测量，Real/Imag/Z 持续刷新。
 
 **自动流程**：
-1. `tsp_ad5933_init()` — 复位 + 外部时钟 + 待机
+1. `tsp_ad5933_init()` — Power-down → 外部时钟 → 待机
 2. 回读 CTRL_H/CTRL_L 并显示
 3. ~~`tsp_ad5933_read_temperature()`~~ — 已从当前测试流程中移除
-4. 等待 S2 — 用户接入校准电阻
+4. 等待 S2 — 用户接入校准电阻（300KΩ）
 5. `set_sweep(1000, 0, 0, 100, X1)` + `start_sweep()` — 标定测量
-6. 等待 `DATA_VALID` — 读 Real/Imag — 计算 `GainFactor = 1 / (R_cal × Mag_cal)`
+6. 4 次 REPEAT_FREQ 采样（超时跳过），有效样本取平均 — 计算 `GainFactor = 1 / (R_cal × Mag_avg)`
 7. 等待 S2 — 用户换上被测件
 8. 重新 `start_sweep()` — 进入 live loop
 9. 每帧：等 `DATA_VALID` → 读 Real/Imag → `Z = 1 / (GF × Mag)` → 显示 → `REPEAT_FREQ`
@@ -197,10 +197,10 @@ Delta_Freq_Code  = (f_delta  × 2^29) / MCLK
 
 | 电压范围 | CTRL_H 宏 | 说明 |
 |----------|-----------|------|
-| 2.0 V p-p | `AD5933_VOLT_2000MV` | 默认值，最大输出摆幅 |
-| 1.0 V p-p | `AD5933_VOLT_1000MV` | |
-| 0.4 V p-p | `AD5933_VOLT_400MV` | |
-| 0.2 V p-p | `AD5933_VOLT_200MV` | |
+| 2.0 V p-p | `AD5933_VOLT_2000MV` (0x0000, D10-D9=00) | 默认值，最大输出摆幅 |
+| 1.0 V p-p | `AD5933_VOLT_1000MV` (0x0200, D10-D9=01) | |
+| 0.4 V p-p | `AD5933_VOLT_400MV` (0x0400, D10-D9=10) | |
+| 0.2 V p-p | `AD5933_VOLT_200MV` (0x0600, D10-D9=11) | |
 
 | PGA 增益 | CTRL_H 宏 | 说明 |
 |----------|-----------|------|
@@ -250,7 +250,7 @@ Delta_Freq_Code  = (f_delta  × 2^29) / MCLK
 | 掉电 | `AD5933_CTRL_POWER_DOWN (0xA000)` | 低功耗模式 |
 | 待机 | `AD5933_CTRL_STANDBY (0xB000)` | 待机模式 |
 
-> **宏的位宽度**：以上宏均为 16 位值（与电压/PGA 宏一致）。写入 CTRL_H 寄存器（8 位）时统一使用 `>> 8`：`(uint8_t)((AD5933_CTRL_STANDBY >> 8) | AD5933_VOLT_200MV | AD5933_PGA_X1)`。
+> **宏的位宽度**：以上宏均为 16 位值（与电压/PGA 宏一致）。写入 CTRL_H 寄存器（8 位）时统一使用 `>> 8`：`(uint8_t)((AD5933_CTRL_STANDBY | AD5933_VOLT_2000MV | AD5933_PGA_X1) >> 8)`。
 
 ### 4.3 状态寄存器位 (0x8F)
 
@@ -264,7 +264,7 @@ Delta_Freq_Code  = (f_delta  × 2^29) / MCLK
 
 ```c
 // ===== 初始化和基础 I2C =====
-void    tsp_ad5933_init(void);                       // 复位 + 设外部时钟 + 待机
+void    tsp_ad5933_init(void);                       // Power-down + 外部时钟 + 待机
 uint8_t tsp_ad5933_read_reg(uint8_t reg_addr);       // 读单寄存器
 void    tsp_ad5933_write_reg(uint8_t reg_addr, uint8_t data);  // 写单寄存器
 void    tsp_ad5933_write_block(uint8_t reg_addr, uint8_t *data, uint8_t len);  // 块写
@@ -302,7 +302,7 @@ float temp = signed_code / 32.0f;
 ### 4.6 典型使用流程
 
 ```c
-// 1. 初始化 AD5933（复位 + 外部时钟 + 待机）
+// 1. 初始化 AD5933（Power-down + 外部时钟 + 待机）
 tsp_ad5933_init();
 
 // 2. （可选）读温度验证 I2C 通信——当前测试界面已移除此步骤
@@ -333,7 +333,7 @@ for (uint16_t i = 0; i <= num_increments; i++) {
     // 递增到下一频点（最后一个频点后不递增）
     if (i < num_increments) {
         tsp_ad5933_write_reg(AD5933_REG_CTRL_H,
-            (uint8_t)((AD5933_CTRL_INCREMENT_FREQ >> 8) | AD5933_VOLT_200MV | AD5933_PGA_X1));
+            (uint8_t)((AD5933_CTRL_INCREMENT_FREQ | AD5933_VOLT_2000MV | AD5933_PGA_X1) >> 8));
     }
 }
 
@@ -388,7 +388,7 @@ I2C1.peripheral.sclPin.$assign = "PA29";
 
 - **系统相位补偿未实现**：GainFactor 标定已完成，但系统相位补偿尚未编写
 - **温度显示已移除**：当前测试界面不再调用 `tsp_ad5933_read_temperature()`，Row 2 改为显示校准 Mag / 当前 Mag
-- **RFB 固定 20kΩ**：板载 R37，不可软件调节。待测阻抗远小于 RFB 时 VIN 信号微弱，远大于 RFB 时可能 ADC 饱和。更换 RFB 需焊接替换 R37
+- **RFB = 20kΩ**：板载 R37（参考设计值），不可软件调节。待测阻抗远小于 RFB 时 VIN 信号微弱，远大于 RFB 时可能 ADC 饱和。校准电阻应与待测阻抗在同一数量级
 - **J15 仅两路信号**：SENSE_IN (Pin 4) 和 VOUT_BUF (Pin 5)，其余为 NC 或 GND。不支持四线 Kelvin 接法
 
 ---

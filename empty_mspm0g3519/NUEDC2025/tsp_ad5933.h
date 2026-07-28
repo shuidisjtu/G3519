@@ -37,10 +37,10 @@
 #define AD5933_CTRL_STANDBY          0xB000  /* Standby mode */
 
 /* Output voltage range (CTRL_H D10-D9) */
-#define AD5933_VOLT_2000MV           0x0000  /* 2.0 V p-p */
-#define AD5933_VOLT_200MV            0x0200  /* 0.2 V p-p */
-#define AD5933_VOLT_400MV            0x0400  /* 0.4 V p-p */
-#define AD5933_VOLT_1000MV           0x0600  /* 1.0 V p-p */
+#define AD5933_VOLT_2000MV           0x0000  /* 2.0 V p-p (D10-D9=00) */
+#define AD5933_VOLT_1000MV           0x0200  /* 1.0 V p-p (D10-D9=01) */
+#define AD5933_VOLT_400MV            0x0400  /* 0.4 V p-p (D10-D9=10) */
+#define AD5933_VOLT_200MV            0x0600  /* 0.2 V p-p (D10-D9=11) */
 
 /* PGA gain (CTRL_H D8): datasheet Table 7 — D8=1 means ×1, D8=0 means ×5 */
 #define AD5933_PGA_X1                0x0100
