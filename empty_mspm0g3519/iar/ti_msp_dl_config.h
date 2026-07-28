@@ -142,6 +142,22 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 #define UART_K230_BAUD_RATE                                               (9600)
 #define UART_K230_IBRD_80_MHZ_9600_BAUD                                    (520)
 #define UART_K230_FBRD_80_MHZ_9600_BAUD                                     (53)
+/* Defines for UART_TJC */
+#define UART_TJC_INST                                                      UART3
+#define UART_TJC_INST_FREQUENCY                                         80000000
+#define UART_TJC_INST_IRQHandler                                UART3_IRQHandler
+#define UART_TJC_INST_INT_IRQN                                    UART3_INT_IRQn
+#define GPIO_UART_TJC_RX_PORT                                              GPIOC
+#define GPIO_UART_TJC_TX_PORT                                              GPIOC
+#define GPIO_UART_TJC_RX_PIN                                       DL_GPIO_PIN_7
+#define GPIO_UART_TJC_TX_PIN                                       DL_GPIO_PIN_6
+#define GPIO_UART_TJC_IOMUX_RX                                   (IOMUX_PINCM85)
+#define GPIO_UART_TJC_IOMUX_TX                                   (IOMUX_PINCM84)
+#define GPIO_UART_TJC_IOMUX_RX_FUNC                    IOMUX_PINCM85_PF_UART3_RX
+#define GPIO_UART_TJC_IOMUX_TX_FUNC                    IOMUX_PINCM84_PF_UART3_TX
+#define UART_TJC_BAUD_RATE                                                (9600)
+#define UART_TJC_IBRD_80_MHZ_9600_BAUD                                     (520)
+#define UART_TJC_FBRD_80_MHZ_9600_BAUD                                      (53)
 
 
 
@@ -263,6 +279,7 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 void SYSCFG_DL_I2C_AD5933_init(void);
 void SYSCFG_DL_UART_0_init(void);
 void SYSCFG_DL_UART_K230_init(void);
+void SYSCFG_DL_UART_TJC_init(void);
 void SYSCFG_DL_LCD_init(void);
 void SYSCFG_DL_ADC12_0_init(void);
 void SYSCFG_DL_ADC12_1_init(void);

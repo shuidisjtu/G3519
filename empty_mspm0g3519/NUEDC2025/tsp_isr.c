@@ -2,6 +2,7 @@
 #include "tsp_encoder.h"
 #include "tsp_uart.h"
 #include "tsp_uart6.h"
+#include "tsp_uart3.h"
 
 volatile uint32_t sys_tick_counter = 0;
 volatile static uint32_t delay;
@@ -62,4 +63,12 @@ void UART0_IRQHandler(void)
 void UART6_IRQHandler(void)
 {
     tsp_uart6_isr();
+}
+
+/* ================================================================
+ * UART3_IRQHandler — RX interrupt for TJC serial screen
+ * ================================================================ */
+void UART3_IRQHandler(void)
+{
+    tsp_uart3_isr();
 }

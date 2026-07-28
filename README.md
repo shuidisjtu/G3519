@@ -20,10 +20,10 @@
 
 ### TJC 4.3 寸串口屏（外接）
 
-- TJC4827X543_011C（X5 系列，480×272 触摸屏），通过 UART6 (J11) 通信
+- TJC4827X543_011C（X5 系列，480×272 触摸屏），通过 UART3 (J4, PC6 TX/PC7 RX) 通信
 - USART HMI 工程文件位于 `empty_mspm0g3519/TJC4827X543_011/`
 - 核心技能已验证：按钮事件(0x65)、页面跳转、数值/文本更新、addt 波形透传
-- 硬件注意：屏 TX (5V) → MCU PC10 (3.3V) 需电平转换（10kΩ/20kΩ 分压）
+- 硬件注意：J4 Pin1 (5V) 带载不足，TJC 屏需从其他 5V 接口独立供电
 - 详见 [`docs/development_reference/TJC4827X543_011C_Use.md`](empty_mspm0g3519/docs/development_reference/TJC4827X543_011C_Use.md)
 
 > 已从 G3519 移除的模块：K230 视觉模块、CCD 线阵传感器、DRV8874 电机驱动、MPU6050 陀螺仪。
@@ -74,8 +74,8 @@
 ### UART 文本命令协议
 
 - **UART0→PC**：MFCLK 4MHz, 115200-8N1, PA10(TX)/PA11(RX), TX 10ms 超时保护（脱机安全）
+- **UART3→TJC 屏**：BUSCLK 80MHz, 115200-8N1, PC6(TX)/PC7(RX), J4，TJC X5 串口屏通信已验证
 - **UART6→K230**：BUSCLK 80MHz, 115200-8N1, PC11(TX)/PC10(RX), J11（待硬件验证）
-- **UART6→TJC 屏**：同 UART6，TJC X5 串口屏通信已验证（9600 8N1），屏 TX 需 5V→3.3V 电平转换
 - 命令格式：`CMD[,PARAM]\r\n` → `OK[,DATA]\r\n` / `ERR,msg\r\n`
 - 支持命令：VER?, ADC, FREQ, DDS, FFT
 
@@ -94,7 +94,8 @@
 | **ADC0** | J2：PA25(VIN1/CH2), PA24(VIN3/CH3), PB24(VIN4/CH5) |
 | **ADC1** | J2：PB23(VIN2/CH11), PA23(VIN5/CH12) |
 | **UART0** | PC 调试：MFCLK 4MHz, 115200-8N1，PA10(TX)/PA11(RX)，10ms 超时 |
-| **UART6** | TJC 屏/K230：BUSCLK 80MHz, 115200-8N1，PC11(TX)/PC10(RX)，J11 |
+| **UART3** | TJC 串口屏：BUSCLK 80MHz, 115200-8N1，PC6(TX)/PC7(RX)，J4 |
+| **UART6** | K230：BUSCLK 80MHz, 115200-8N1，PC11(TX)/PC10(RX)，J11 |
 | **调试器** | DAPLink (CMSIS-DAP v2) |
 | **供电** | USB-C，禁止多路同时供电 |
 

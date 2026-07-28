@@ -40,6 +40,7 @@
 
 #include "ti_msp_dl_config.h"
 
+DL_UART_Main_backupConfig gUART_TJCBackup;
 DL_SPI_backupConfig gLCDBackup;
 
 /*
@@ -55,12 +56,13 @@ SYSCONFIG_WEAK void SYSCFG_DL_init(void)
     SYSCFG_DL_I2C_AD5933_init();
     SYSCFG_DL_UART_0_init();
     SYSCFG_DL_UART_K230_init();
+    SYSCFG_DL_UART_TJC_init();
     SYSCFG_DL_LCD_init();
     SYSCFG_DL_ADC12_0_init();
     SYSCFG_DL_ADC12_1_init();
     SYSCFG_DL_SYSTICK_init();
     /* Ensure backup structures have no valid state */
-
+	gUART_TJCBackup.backupRdy 	= false;
 	gLCDBackup.backupRdy 	= false;
 
 }
@@ -72,6 +74,7 @@ SYSCONFIG_WEAK bool SYSCFG_DL_saveConfiguration(void)
 {
     bool retStatus = true;
 
+	retStatus &= DL_UART_Main_saveConfiguration(UART_TJC_INST, &gUART_TJCBackup);
 	retStatus &= DL_SPI_saveConfiguration(LCD_INST, &gLCDBackup);
 
     return retStatus;
@@ -82,6 +85,7 @@ SYSCONFIG_WEAK bool SYSCFG_DL_restoreConfiguration(void)
 {
     bool retStatus = true;
 
+	retStatus &= DL_UART_Main_restoreConfiguration(UART_TJC_INST, &gUART_TJCBackup);
 	retStatus &= DL_SPI_restoreConfiguration(LCD_INST, &gLCDBackup);
 
     return retStatus;
@@ -95,6 +99,7 @@ SYSCONFIG_WEAK void SYSCFG_DL_initPower(void)
     DL_I2C_reset(I2C_AD5933_INST);
     DL_UART_Main_reset(UART_0_INST);
     DL_UART_Main_reset(UART_K230_INST);
+    DL_UART_Main_reset(UART_TJC_INST);
     DL_SPI_reset(LCD_INST);
     DL_ADC12_reset(ADC12_0_INST);
     DL_ADC12_reset(ADC12_1_INST);
@@ -106,6 +111,7 @@ SYSCONFIG_WEAK void SYSCFG_DL_initPower(void)
     DL_I2C_enablePower(I2C_AD5933_INST);
     DL_UART_Main_enablePower(UART_0_INST);
     DL_UART_Main_enablePower(UART_K230_INST);
+    DL_UART_Main_enablePower(UART_TJC_INST);
     DL_SPI_enablePower(LCD_INST);
     DL_ADC12_enablePower(ADC12_0_INST);
     DL_ADC12_enablePower(ADC12_1_INST);
@@ -140,6 +146,10 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
         GPIO_UART_K230_IOMUX_TX, GPIO_UART_K230_IOMUX_TX_FUNC);
     DL_GPIO_initPeripheralInputFunction(
         GPIO_UART_K230_IOMUX_RX, GPIO_UART_K230_IOMUX_RX_FUNC);
+    DL_GPIO_initPeripheralOutputFunction(
+        GPIO_UART_TJC_IOMUX_TX, GPIO_UART_TJC_IOMUX_TX_FUNC);
+    DL_GPIO_initPeripheralInputFunction(
+        GPIO_UART_TJC_IOMUX_RX, GPIO_UART_TJC_IOMUX_RX_FUNC);
 
     DL_GPIO_initPeripheralInputFunction(
         GPIO_LCD_IOMUX_POCI, GPIO_LCD_IOMUX_POCI_FUNC);
@@ -419,6 +429,41 @@ SYSCONFIG_WEAK void SYSCFG_DL_UART_K230_init(void)
 
 
     DL_UART_Main_enable(UART_K230_INST);
+}
+static const DL_UART_Main_ClockConfig gUART_TJCClockConfig = {
+    .clockSel    = DL_UART_MAIN_CLOCK_BUSCLK,
+    .divideRatio = DL_UART_MAIN_CLOCK_DIVIDE_RATIO_1
+};
+
+static const DL_UART_Main_Config gUART_TJCConfig = {
+    .mode        = DL_UART_MAIN_MODE_NORMAL,
+    .direction   = DL_UART_MAIN_DIRECTION_TX_RX,
+    .flowControl = DL_UART_MAIN_FLOW_CONTROL_NONE,
+    .parity      = DL_UART_MAIN_PARITY_NONE,
+    .wordLength  = DL_UART_MAIN_WORD_LENGTH_8_BITS,
+    .stopBits    = DL_UART_MAIN_STOP_BITS_ONE
+};
+
+SYSCONFIG_WEAK void SYSCFG_DL_UART_TJC_init(void)
+{
+    DL_UART_Main_setClockConfig(UART_TJC_INST, (DL_UART_Main_ClockConfig *) &gUART_TJCClockConfig);
+
+    DL_UART_Main_init(UART_TJC_INST, (DL_UART_Main_Config *) &gUART_TJCConfig);
+    /*
+     * Configure baud rate by setting oversampling and baud rate divisors.
+     *  Target baud rate: 9600
+     *  Actual baud rate: 9600.1
+     */
+    DL_UART_Main_setOversampling(UART_TJC_INST, DL_UART_OVERSAMPLING_RATE_16X);
+    DL_UART_Main_setBaudRateDivisor(UART_TJC_INST, UART_TJC_IBRD_80_MHZ_9600_BAUD, UART_TJC_FBRD_80_MHZ_9600_BAUD);
+
+
+    /* Configure Interrupts */
+    DL_UART_Main_enableInterrupt(UART_TJC_INST,
+                                 DL_UART_MAIN_INTERRUPT_RX);
+
+
+    DL_UART_Main_enable(UART_TJC_INST);
 }
 
 static const DL_SPI_Config gLCD_config = {

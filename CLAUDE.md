@@ -36,11 +36,12 @@ empty_mspm0g3519/
 ├── TJC4827X543_011/                   ← TJC 串口屏工程
 │   └── TJC4827X543.HMI                ← USART HMI 工程文件（480×272, X5 系列）
 ├── NUEDC2025/                         ← 应用层驱动
-│   ├── tsp_isr.h/.c                   ← SysTick 延时 + GROUP1/UART0/UART6 中断分发
+│   ├── tsp_isr.h/.c                   ← SysTick 延时 + GROUP1/UART0/UART3/UART6 中断分发
 │   ├── tsp_key.h/.c                   ← 4 键扫描（20ms 消抖，边沿检测）
 │   ├── tsp_encoder.h/.c               ← 编码器（PHA0 中断正交解码，20ms 速度）
 │   ├── tsp_uart.h/.c                  ← UART0（MFCLK 4MHz, 115200-8N1, 超时 TX, 环形缓冲 RX）
-│   ├── tsp_uart6.h/.c                 ← UART6（BUSCLK 80MHz, J11 TJC 屏/K230, 超时 TX, 环形缓冲 RX）
+│   ├── tsp_uart3.h/.c                 ← UART3（BUSCLK 80MHz, J4 TJC 屏, 超时 TX, 环形缓冲 RX）
+│   ├── tsp_uart6.h/.c                 ← UART6（BUSCLK 80MHz, J11 K230, 超时 TX, 环形缓冲 RX）
 │   ├── tsp_cmd.h/.c                   ← 文本命令协议（VER?/ADC/FREQ/DDS/FFT）
 │   ├── tsp_ad5933.h/.c                ← AD5933 阻抗测量（I2C1, 100kHz, 温度+扫频）
 │   ├── tsp_dds.h/.c                   ← AD9833 DDS 波形发生器（GPIO bit-bang, 方波/正弦/三角波）
@@ -76,7 +77,8 @@ empty_mspm0g3519/
 | AD5933 (I2C1) | PA29(SCL), PA30(SDA) | `I2C_AD5933_INST`（SysConfig 宏） |
 | DDS GPIO | PC2(SCLK), PC3(SDATA), PC24(FSYNC) | `DDS_SCLK/SDATA/FSYNC` |
 | UART0 | PA10(TX), PA11(RX) | IOMUX_PINCM21/22 |
-| UART6 (TJC/K230) | PC11(TX), PC10(RX) | J11, IOMUX_PINCM87/88 |
+| UART3 (TJC 屏) | PC6(TX), PC7(RX) | J4, IOMUX_PINCM78/79 |
+| UART6 (K230) | PC11(TX), PC10(RX) | J11, IOMUX_PINCM87/88 |
 | ADC0 (J2) | PA25(VIN1/CH2), PA24(VIN3/CH3), PB24(VIN4/CH5) | `ADC12_0_INST` |
 | ADC1 (J2) | PB23(VIN2/CH11), PA23(VIN5/CH12) | `ADC12_1_INST` |
 
@@ -94,7 +96,8 @@ empty_mspm0g3519/
 | GPIO3 | PORTC | 4 引脚：S1(PC0), DDS_SCLK(PC2), DDS_SDATA(PC3), DDS_FSYNC(PC24) |
 | SPI1 | LCD | ST7735 LCD, BUSCLK, 10MHz, MOTO3 |
 | UART1 | UART_0 | UART0, MFCLK 4MHz, PA10(TX)/PA11(RX) |
-| UART2 | UART_K230 | UART6, BUSCLK 80MHz, PC11(TX)/PC10(RX), J11（TJC 屏/K230） |
+| UART2 | UART_K230 | UART6, BUSCLK 80MHz, PC11(TX)/PC10(RX), J11（K230） |
+| UART3 | UART_TJC | UART3, BUSCLK 80MHz, PC6(TX)/PC7(RX), J4（TJC 串口屏） |
 | I2C1 | I2C_AD5933 | AD5933, 100kHz Controller, PA29(SCL)/PA30(SDA) |
 | ADC12 | ADC12_0 | ADC0, ULPCLK 40MHz, 2.5μs 采样, PA25(CH2), 轮询模式 |
 | ADC12 | ADC12_1 | ADC1, ULPCLK 40MHz, 2.5μs 采样, PB23(CH11), 轮询模式 |
@@ -150,12 +153,15 @@ tsp_uart_send_string("hello\r\n");
 printf("val=%d\n", x);                 // 已重定向到 UART0（__write → 超时 TX）
 // TX 已加 10ms 超时：脱机（不接 DAPLink）时静默失败，MCU 不卡死
 
-// ===== UART6 K230/TJC（tsp_uart6.c，BUSCLK 80MHz，J11） =====
+// ===== UART3 TJC 串口屏（tsp_uart3.c，BUSCLK 80MHz，J4） =====
+tsp_uart3_init(115200);                  // 波特率 + NVIC + 环形缓冲
+tsp_uart3_rx_enable();
+tsp_uart3_send_string("hello\r\n");
+
+// ===== UART6 K230（tsp_uart6.c，BUSCLK 80MHz，J11） =====
 tsp_uart6_init(115200);                 // 波特率 + NVIC + 环形缓冲
 tsp_uart6_rx_enable();
 tsp_uart6_send_string("hello\r\n");
-// TJC 屏：PC10(RX) 非 5V 耐受，屏 TX→MCU RX 需 5V→3.3V 电平转换（10kΩ/20kΩ 分压）
-// 详见 docs/TJC4827X543_011C_Use.md
 
 // ===== 文本命令协议（tsp_cmd.c） =====
 tsp_cmd_init(tsp_uart_send_string, tsp_uart_read_byte, tsp_uart_available);
@@ -237,8 +243,8 @@ tsp_scope_vline(x, y0, y1, color);           // 快速垂直线（bulk SPI，用
 // 网格: 水平 25%/50%/75% + 垂直频率标记 (200/500/1k/2k/5k/10k/20kHz, "1k"/"10k" 标签)
 // Sweep 交互: S0/S1 切换通道（Cal 后锁定）, S2 循环 Cal→Meas→切换增益/相位, PUSH 退出/中止（中止保留 Cal 数据）
 
-// ===== TJC 串口屏驱动（tsp_tjc.c/.h，UART6 J11，协议层） =====
-tsp_tjc_init(9600);                          // 初始化 UART6 + RX 使能（首次联调用 9600）
+// ===== TJC 串口屏驱动（tsp_tjc.c/.h，UART3 J4，协议层） =====
+tsp_tjc_init(115200);                        // 初始化 UART3 + RX 使能
 tsp_tjc_page(1);                             // 页面跳转: page 1
 tsp_tjc_set_val("n0", 1234);                 // 数字框更新: n0.val=1234
 tsp_tjc_set_txt("t0", "Hello");              // 文本框更新: t0.txt="Hello"
@@ -247,7 +253,8 @@ tsp_tjc_cmd("cle s0.id,0");                  // 任意命令（自动追加 FF F
 uint8_t ok = tsp_tjc_addt("s0", 0, data, 100);  // 波形透传: addt + 0xFE 握手 + 发数据 + 0xFD
 tjc_event_t evt;
 if (tsp_tjc_poll(&evt)) { /* evt.page_id, evt.comp_id, evt.event */ }  // 解析按钮事件 0x65
-// 屏 TX 约 5V，PC10 需 5V→3.3V 分压（10kΩ/20kΩ）。详见 docs/TJC4827X543_011C_Use.md
+// 屏 TX 约 5V，PC7 需 5V→3.3V 分压（10kΩ/20kΩ）。详见 docs/TJC4827X543_011C_Use.md
+// ⚠️ J4 Pin1 (5V) 带载不足，TJC 屏需从其他 5V 接口独立供电
 ```
 
 ## IAR 关键路径

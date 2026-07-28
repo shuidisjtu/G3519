@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <iarUserArgVars>
-    <group name="MSPM0_SDK_INSTALL_DIR" active="true" />
+    <group name="TI" active="true" />
 </iarUserArgVars>

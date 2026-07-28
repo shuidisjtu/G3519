@@ -1,5 +1,5 @@
 #include "tsp_tjc.h"
-#include "tsp_uart6.h"
+#include "tsp_uart3.h"
 #include "tsp_isr.h"
 
 #define TJC_CMD_BUF_SIZE	64
@@ -7,13 +7,29 @@
 
 extern volatile uint32_t sys_tick_counter;
 
+/* ─── RX state machine (used by addt + poll) ─── */
+
+enum {
+	TJC_RX_IDLE = 0,
+	TJC_RX_HEAD,
+	TJC_RX_BODY,
+	TJC_RX_TAIL
+};
+
+static uint8_t  rx_state;
+static uint8_t  rx_head;
+static uint8_t  rx_body[3];
+static uint8_t  rx_body_idx;
+static uint8_t  rx_tail_idx;
+static uint8_t  rx_skip_count;
+
 /* ─── Terminator ─── */
 
 static void tjc_send_end(void)
 {
-	tsp_uart6_send_byte(0xFF);
-	tsp_uart6_send_byte(0xFF);
-	tsp_uart6_send_byte(0xFF);
+	tsp_uart3_send_byte(0xFF);
+	tsp_uart3_send_byte(0xFF);
+	tsp_uart3_send_byte(0xFF);
 }
 
 /* ─── Integer to ASCII (no sprintf) ─── */
@@ -72,15 +88,15 @@ static uint8_t tjc_utoa16(char *buf, uint16_t val)
 
 void tsp_tjc_init(uint32_t baudrate)
 {
-	tsp_uart6_init(baudrate);
-	tsp_uart6_rx_enable();
+	tsp_uart3_init(baudrate);
+	tsp_uart3_rx_enable();
 }
 
 /* ─── Send commands ─── */
 
 void tsp_tjc_cmd(const char *raw_cmd)
 {
-	tsp_uart6_send_string(raw_cmd);
+	tsp_uart3_send_string(raw_cmd);
 	tjc_send_end();
 }
 
@@ -121,9 +137,9 @@ void tsp_tjc_set_txt(const char *obj, const char *txt)
 	buf[p++] = '='; buf[p++] = '"';
 	buf[p] = '\0';
 
-	tsp_uart6_send_string(buf);
-	tsp_uart6_send_string(txt);
-	tsp_uart6_send_byte('"');
+	tsp_uart3_send_string(buf);
+	tsp_uart3_send_string(txt);
+	tsp_uart3_send_byte('"');
 	tjc_send_end();
 }
 
@@ -146,8 +162,8 @@ static uint8_t tjc_wait_byte(uint8_t target, uint32_t timeout_ms)
 {
 	uint32_t start = sys_tick_counter;
 	while ((sys_tick_counter - start) < timeout_ms) {
-		if (tsp_uart6_available() > 0) {
-			uint8_t b = tsp_uart6_read_byte();
+		if (tsp_uart3_available() > 0) {
+			uint8_t b = tsp_uart3_read_byte();
 			if (b == target)
 				return 1;
 		}
@@ -172,33 +188,19 @@ uint8_t tsp_tjc_addt(const char *obj, uint8_t ch,
 	p += tjc_utoa16(&buf[p], len);
 	buf[p] = '\0';
 
-	tsp_uart6_flush_rx();
+	tsp_uart3_flush_rx();
 	rx_state = TJC_RX_IDLE;
 	tsp_tjc_cmd(buf);
 
 	if (!tjc_wait_byte(0xFE, TJC_ADDT_TIMEOUT_MS))
 		return 0;
 
-	tsp_uart6_send_bytes(data, len);
+	tsp_uart3_send_bytes(data, len);
 
 	return tjc_wait_byte(0xFD, TJC_ADDT_TIMEOUT_MS);
 }
 
 /* ─── Event polling (0x65 frame state machine) ─── */
-
-enum {
-	TJC_RX_IDLE = 0,
-	TJC_RX_HEAD,
-	TJC_RX_BODY,
-	TJC_RX_TAIL
-};
-
-static uint8_t  rx_state;
-static uint8_t  rx_head;
-static uint8_t  rx_body[3];
-static uint8_t  rx_body_idx;
-static uint8_t  rx_tail_idx;
-static uint8_t  rx_skip_count;
 
 static const uint8_t frame_body_len[] = {
 	/* 0x00 */ 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -214,8 +216,8 @@ static const uint8_t frame_body_len[] = {
 
 uint8_t tsp_tjc_poll(tjc_event_t *evt)
 {
-	while (tsp_uart6_available() > 0) {
-		uint8_t b = tsp_uart6_read_byte();
+	while (tsp_uart3_available() > 0) {
+		uint8_t b = tsp_uart3_read_byte();
 
 		switch (rx_state) {
 		case TJC_RX_IDLE:

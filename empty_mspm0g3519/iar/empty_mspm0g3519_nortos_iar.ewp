@@ -1189,6 +1189,12 @@
             <name>$PROJ_DIR$\..\NUEDC2025\tsp_uart6.h</name>
         </file>
         <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_uart3.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\NUEDC2025\tsp_uart3.h</name>
+        </file>
+        <file>
             <name>$PROJ_DIR$\..\NUEDC2025\tsp_cmd.c</name>
         </file>
         <file>

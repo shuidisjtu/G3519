@@ -4,8 +4,9 @@
 #include <stdint.h>
 
 /* TJC serial screen driver (TJC4827X543_011C, X5 series, 480x272).
- * Protocol layer on top of tsp_uart6.  UART6 on PC11(TX)/PC10(RX), J11.
- * Screen TX is ~5V — PC10 needs 5V→3.3V level shifting (10k/20k divider). */
+ * Protocol layer on top of tsp_uart3.  UART3 on PC6(TX)/PC7(RX), J4.
+ * Screen TX is ~5V — PC7 needs 5V→3.3V level shifting (10k/20k divider).
+ * J4 Pin1 (5V) cannot power the screen — use separate 5V supply. */
 
 typedef struct {
 	uint8_t page_id;
@@ -13,7 +14,7 @@ typedef struct {
 	uint8_t event;		/* 0x01=press, 0x00=release */
 } tjc_event_t;
 
-/* Init UART6 at given baudrate and enable RX */
+/* Init UART3 at given baudrate and enable RX */
 void tsp_tjc_init(uint32_t baudrate);
 
 /* === Send commands (auto-append FF FF FF terminator) === */
@@ -29,7 +30,7 @@ uint8_t tsp_tjc_addt(const char *obj, uint8_t ch,
                      const uint8_t *data, uint16_t len);
 
 /* === Event polling ===
- * Call from main loop.  Parses 0x65 button events from UART6 RX buffer.
+ * Call from main loop.  Parses 0x65 button events from UART3 RX buffer.
  * Returns 1 and fills evt on event, 0 if no complete event available. */
 uint8_t tsp_tjc_poll(tjc_event_t *evt);
 

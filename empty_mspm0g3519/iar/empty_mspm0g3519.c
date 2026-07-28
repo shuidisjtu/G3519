@@ -1131,8 +1131,8 @@ int main(void)
 	tsp_uart_rx_enable();
 	tsp_cmd_init(tsp_uart_send_string, tsp_uart_read_byte, tsp_uart_available);
 
-	/* UART6 → TJC serial screen (J11), 9600 for first-time debug */
-	tsp_tjc_init(9600);
+	/* UART3 → TJC serial screen (J4) */
+	tsp_tjc_init(115200);
 
 	tsp_menu_init("== Signal 2026 ==", main_menu, MAIN_MENU_COUNT);
 
