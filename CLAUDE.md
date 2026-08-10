@@ -17,7 +17,7 @@
 
 ## 项目概述
 
-MSPM0G3519 控制题平台（NUEDC-2026 SAIS@SJTU），从 G3519 基础平台拆分，专注小车/控制类赛题。主控 TI `MSPM0G3519SPZR`（Cortex-M0+, 80MHz），IAR EWARM 9.60.3 + DAPLink。
+MSPM0G3519 控制题平台（NUEDC-2026 SAIS@SJTU），为 G3519 统一仓库的 control 分支（信号题为 signal 分支），专注小车/控制类赛题。主控 TI `MSPM0G3519SPZR`（Cortex-M0+, 80MHz），IAR EWARM 9.60.3 + DAPLink。
 
 工程入口：`empty_mspm0g3519/iar/empty_mspm0g3519.c`。
 

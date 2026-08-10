@@ -1,6 +1,6 @@
 # MSPM0G3519 Control Topic Platform
 
-基于 TI **MSPM0G3519SPZR**（Arm Cortex-M0+, 80MHz）的**控制题专用**开发平台，从 [G3519 基础平台](https://github.com/shuidisjtu/G3519) 拆分而来，专注小车/控制类赛题（NUEDC-2026 SAIS@SJTU）。
+基于 TI **MSPM0G3519SPZR**（Arm Cortex-M0+, 80MHz）的**控制题专用**开发平台，为 [G3519 统一仓库](https://github.com/shuidisjtu/G3519) 的 **control 分支**（信号题对应 signal 分支），专注小车/控制类赛题（NUEDC-2026 SAIS@SJTU）。
 
 集成 K230 视觉导航、CCD 循迹、DRV8874 双电机驱动、MPU6050 IMU、PID 闭环控制，使用 IAR EWARM + DAPLink (CMSIS-DAP) 开发工具链。
 
