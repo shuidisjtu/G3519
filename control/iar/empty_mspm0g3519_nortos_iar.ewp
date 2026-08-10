@@ -256,6 +256,7 @@
                 <option>
                     <name>CCDefines</name>
                     <state>__MSPM0G3519__</state>
+                    <state>TSP_USE_WHEEL_ENC</state>
                 </option>
                 <option>
                     <name>CCPreprocFile</name>

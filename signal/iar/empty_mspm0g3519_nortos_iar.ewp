@@ -386,8 +386,10 @@
                     <state>$MSPM0_SDK_INSTALL_DIR$/source/third_party/CMSIS/Core/Include</state>
                     <state>$MSPM0_SDK_INSTALL_DIR$/source/third_party/CMSIS/DSP/Include</state>
                     <state>$MSPM0_SDK_INSTALL_DIR$/source</state>
-                    <state>$PROJ_DIR$\..\NUEDC2025</state>
-                    <state>$PROJ_DIR$\..\TSP3519</state>
+                    <state>$PROJ_DIR$\..\..\common\NUEDC2025</state>
+                    <state>$PROJ_DIR$\..\..\common\TSP3519</state>
+                    <state>$PROJ_DIR$\..\..\common\drivers</state>
+                    <state>$PROJ_DIR$\..\app</state>
                 </option>
                 <option>
                     <name>CCStdIncCheck</name>
@@ -644,8 +646,8 @@
                 <option>
                     <name>AUserIncludes</name>
                     <state>$PROJ_DIR$</state>
-                    <state>$PROJ_DIR$\..\TSP3519</state>
-                    <state>$PROJ_DIR$\..\NUEDC2025</state>
+                    <state>$PROJ_DIR$\..\..\common\TSP3519</state>
+                    <state>$PROJ_DIR$\..\..\common\NUEDC2025</state>
                 </option>
                 <option>
                     <name>AExtraOptionsCheckV2</name>
@@ -1141,88 +1143,88 @@
     <group>
         <name>NUEDC2025</name>
         <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_encoder.c</name>
+            <name>$PROJ_DIR$\..\..\common\NUEDC2025\tsp_encoder.c</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_encoder.h</name>
+            <name>$PROJ_DIR$\..\..\common\NUEDC2025\tsp_encoder.h</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_isr.c</name>
+            <name>$PROJ_DIR$\..\..\common\NUEDC2025\tsp_isr.c</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_isr.h</name>
+            <name>$PROJ_DIR$\..\..\common\NUEDC2025\tsp_isr.h</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_key.c</name>
+            <name>$PROJ_DIR$\..\..\common\NUEDC2025\tsp_key.c</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_key.h</name>
+            <name>$PROJ_DIR$\..\..\common\NUEDC2025\tsp_key.h</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_uart.c</name>
+            <name>$PROJ_DIR$\..\..\common\NUEDC2025\tsp_uart.c</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_uart.h</name>
+            <name>$PROJ_DIR$\..\..\common\NUEDC2025\tsp_uart.h</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_ad5933.c</name>
+            <name>$PROJ_DIR$\..\..\common\drivers\tsp_ad5933.c</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_ad5933.h</name>
+            <name>$PROJ_DIR$\..\..\common\drivers\tsp_ad5933.h</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_dds.c</name>
+            <name>$PROJ_DIR$\..\..\common\drivers\tsp_dds.c</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_dds.h</name>
+            <name>$PROJ_DIR$\..\..\common\drivers\tsp_dds.h</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_mcp41010.c</name>
+            <name>$PROJ_DIR$\..\app\tsp_mcp41010.c</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_mcp41010.h</name>
+            <name>$PROJ_DIR$\..\app\tsp_mcp41010.h</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_adc.c</name>
+            <name>$PROJ_DIR$\..\..\common\drivers\tsp_adc.c</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_adc.h</name>
+            <name>$PROJ_DIR$\..\..\common\drivers\tsp_adc.h</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_uart6.c</name>
+            <name>$PROJ_DIR$\..\..\common\NUEDC2025\tsp_uart_k230.c</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_uart6.h</name>
+            <name>$PROJ_DIR$\..\..\common\NUEDC2025\tsp_uart_k230.h</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_uart3.c</name>
+            <name>$PROJ_DIR$\..\..\common\drivers\tsp_uart3.c</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_uart3.h</name>
+            <name>$PROJ_DIR$\..\..\common\drivers\tsp_uart3.h</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_cmd.c</name>
+            <name>$PROJ_DIR$\..\app\tsp_cmd.c</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_cmd.h</name>
+            <name>$PROJ_DIR$\..\app\tsp_cmd.h</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_fft.c</name>
+            <name>$PROJ_DIR$\..\app\tsp_fft.c</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_fft.h</name>
+            <name>$PROJ_DIR$\..\app\tsp_fft.h</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_scope.c</name>
+            <name>$PROJ_DIR$\..\app\tsp_scope.c</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_scope.h</name>
+            <name>$PROJ_DIR$\..\app\tsp_scope.h</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_tjc.c</name>
+            <name>$PROJ_DIR$\..\app\tsp_tjc.c</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\NUEDC2025\tsp_tjc.h</name>
+            <name>$PROJ_DIR$\..\app\tsp_tjc.h</name>
         </file>
     </group>
     <group>
@@ -1240,22 +1242,22 @@
     <group>
         <name>TSP3519</name>
         <file>
-            <name>$PROJ_DIR$\..\TSP3519\tsp_gpio.c</name>
+            <name>$PROJ_DIR$\..\..\common\TSP3519\tsp_gpio.c</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\TSP3519\tsp_gpio.h</name>
+            <name>$PROJ_DIR$\..\..\common\TSP3519\tsp_gpio.h</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\TSP3519\tsp_menu.c</name>
+            <name>$PROJ_DIR$\..\..\common\TSP3519\tsp_menu.c</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\TSP3519\tsp_menu.h</name>
+            <name>$PROJ_DIR$\..\..\common\TSP3519\tsp_menu.h</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\TSP3519\TSP_TFT18.c</name>
+            <name>$PROJ_DIR$\..\..\common\TSP3519\TSP_TFT18.c</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\TSP3519\TSP_TFT18.h</name>
+            <name>$PROJ_DIR$\..\..\common\TSP3519\TSP_TFT18.h</name>
         </file>
     </group>
     <file>

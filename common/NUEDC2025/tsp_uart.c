@@ -1,25 +1,24 @@
 #include "tsp_uart.h"
+#include "tsp_isr.h"
 
-/* ===== UART0 Pin Configuration =====
- * Default: PA10 = TX, PA11 = RX (matching schematic).
- * These pins are free (not in current SysConfig).
- * Change IOMUX macros below if using different pins.
- */
 #define TSP_UART            UART0
 #define TSP_UART_INT_IRQN   UART0_INT_IRQn
-
-/* UART0 RX pin: PA11 -> IOMUX_PINCM22, alternate function UART0_RX */
-#define UART_RX_IOMUX       IOMUX_PINCM22
-#define UART_RX_FUNC        IOMUX_PINCM22_PF_UART0_RX
-
-/* UART0 TX pin: PA10 -> IOMUX_PINCM21, alternate function UART0_TX */
-#define UART_TX_IOMUX       IOMUX_PINCM21
-#define UART_TX_FUNC        IOMUX_PINCM21_PF_UART0_TX
+#define TX_TIMEOUT_MS       10
 
 /* ─── Ring buffer ─── */
 static volatile uint8_t  g_uart_rx_buf[UART_RX_BUF_SIZE];
 static volatile uint16_t g_uart_rx_in;   /* write index (ISR) */
 static volatile uint16_t g_uart_rx_out;  /* read index (main) */
+
+/* ─── TX with timeout (prevents hang when DAPLink disconnected) ─── */
+static void uart_tx_byte(uint8_t data)
+{
+    uint32_t start = sys_tick_counter;
+    while (DL_UART_isBusy(TSP_UART)) {
+        if ((sys_tick_counter - start) > TX_TIMEOUT_MS) return;
+    }
+    DL_UART_transmitData(TSP_UART, data);
+}
 
 /* ─── Init ───
  * SysConfig (SYSCFG_DL_UART_0_init via SYSCFG_DL_init) handles:
@@ -63,21 +62,21 @@ void tsp_uart_rx_disable(void)
 /* ─── TX (blocking) ─── */
 void tsp_uart_send_byte(uint8_t data)
 {
-    DL_UART_transmitDataBlocking(TSP_UART, data);
+    uart_tx_byte(data);
 }
 
 void tsp_uart_send_bytes(const uint8_t *data, uint32_t len)
 {
     uint32_t i;
     for (i = 0; i < len; i++) {
-        DL_UART_transmitDataBlocking(TSP_UART, data[i]);
+        uart_tx_byte(data[i]);
     }
 }
 
 void tsp_uart_send_string(const char *str)
 {
     while (*str) {
-        DL_UART_transmitDataBlocking(TSP_UART, (uint8_t)*str);
+        uart_tx_byte((uint8_t)*str);
         str++;
     }
 }
@@ -145,7 +144,7 @@ size_t __write(int handle, const unsigned char *buf, size_t bufSize)
     /* Only handle stdout and stderr */
     if (handle == _LLIO_STDOUT || handle == _LLIO_STDERR) {
         for (n = 0; n < bufSize; n++) {
-            DL_UART_transmitDataBlocking(TSP_UART, buf[n]);
+            uart_tx_byte(buf[n]);
         }
         return bufSize;
     }

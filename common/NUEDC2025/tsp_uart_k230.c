@@ -1,4 +1,5 @@
 #include "tsp_uart_k230.h"
+#include "tsp_isr.h"
 
 /* ===== UART6 (K230) Configuration =====
  * All hardware setup (power, IOMUX PC10/PC11, BUSCLK, 8N1, 115200,
@@ -7,11 +8,22 @@
  */
 #define K230_UART            UART_K230_INST
 #define K230_UART_INT_IRQN   UART_K230_INST_INT_IRQN
+#define K230_TX_TIMEOUT_MS  10
 
 /* ─── Ring buffer ─── */
 static volatile uint8_t  g_k230_rx_buf[K230_UART_RX_BUF_SIZE];
 static volatile uint16_t g_k230_rx_in;   /* write index (ISR) */
 static volatile uint16_t g_k230_rx_out;  /* read index (main) */
+
+/* TX with timeout (prevents hang when DAPLink disconnected) */
+static void k230_tx_byte(uint8_t data)
+{
+    uint32_t start = sys_tick_counter;
+    while (DL_UART_isBusy(K230_UART)) {
+        if ((sys_tick_counter - start) > K230_TX_TIMEOUT_MS) return;
+    }
+    DL_UART_transmitData(K230_UART, data);
+}
 
 /* ─── Init ───
  * SysConfig enables the UART-level RX interrupt source by default
@@ -48,21 +60,21 @@ void tsp_uart_k230_rx_disable(void)
 /* ─── TX (blocking) ─── */
 void tsp_uart_k230_send_byte(uint8_t data)
 {
-    DL_UART_transmitDataBlocking(K230_UART, data);
+    k230_tx_byte(data);
 }
 
 void tsp_uart_k230_send_bytes(const uint8_t *data, uint32_t len)
 {
     uint32_t i;
     for (i = 0; i < len; i++) {
-        DL_UART_transmitDataBlocking(K230_UART, data[i]);
+        k230_tx_byte(data[i]);
     }
 }
 
 void tsp_uart_k230_send_string(const char *str)
 {
     while (*str) {
-        DL_UART_transmitDataBlocking(K230_UART, (uint8_t)*str);
+        k230_tx_byte((uint8_t)*str);
         str++;
     }
 }

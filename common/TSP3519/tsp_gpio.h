@@ -60,4 +60,13 @@
 /* Motor driver DRV8874 control (PB1=SLEEP, PA7=FAULT).
  * IN1/IN2 of both channels are TIMA0 CCP outputs, not GPIO -- see tsp_motor.c */
 
+/* MCP41010 digital potentiometer bit-bang SPI (J2 pin6-8: PC25/PC26/PC27)
+ * -- signal topic PGA driver (tsp_mcp41010.c) */
+#define PGA_CS_LOW()       DL_GPIO_clearPins(GPIOC, DL_GPIO_PIN_25)
+#define PGA_CS_HIGH()      DL_GPIO_setPins(GPIOC, DL_GPIO_PIN_25)
+#define PGA_SCK_LOW()      DL_GPIO_clearPins(GPIOC, DL_GPIO_PIN_26)
+#define PGA_SCK_HIGH()     DL_GPIO_setPins(GPIOC, DL_GPIO_PIN_26)
+#define PGA_SI_LOW()       DL_GPIO_clearPins(GPIOC, DL_GPIO_PIN_27)
+#define PGA_SI_HIGH()      DL_GPIO_setPins(GPIOC, DL_GPIO_PIN_27)
+
 #endif
