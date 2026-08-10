@@ -10,6 +10,7 @@ G3519 共享平台文档（硬件参考、外设驱动使用、测试方案）�
 | [G3510_expansion_board.md](G3510_expansion_board.md) | 双电机扩展板硬件参考 |
 | [MSPM0G3519_UART_Use.md](MSPM0G3519_UART_Use.md) | UART0 调试串口使用 |
 | [3519_hardware/](3519_hardware/) | 板卡原理图/芯片手册/接线图（PDF/图片） |
+| [datasheets/](datasheets/) | 芯片官方手册库（mcu/peripherals/instruments，见下文） |
 
 ## 外设与模块使用
 
@@ -32,6 +33,14 @@ G3519 共享平台文档（硬件参考、外设驱动使用、测试方案）�
 | 文档 | 说明 |
 |------|------|
 | [2026_material_list.md](2026_material_list.md) | 2026 电赛材料清单（控制题/信号题共享） |
+
+## 芯片手册库（`datasheets/`）
+
+精选自 F 盘备赛资料库（`F:\电赛\备赛知识相关`），与项目在用的主控/外设/仪器配套。参考代码工程不入库（按需查 F 盘）。
+
+- `mcu/`：MSPM0 G-Series TRM（80MHz 系列完整手册）、Errata
+- `peripherals/`：AD5933（含 UG-364 评估板）、AD9833、AD8302、AD8606、DRV8874、MPU6050、AD603、AD620、SA5532、WRA_S-1WR2（电源）、MPY634
+- `instruments/`：AD2 用户手册
 
 ## K230 固件参考（`k230_firmware_ref/`）
 
