@@ -405,7 +405,7 @@ tsp_pga_set_gain(20);     // 设置目标增益 ×10 单位 (20 = 2.0x)
 
 一片同时输出幅度比 (VMAG) + 相位差 (VPHS)，用于 RF/IF 增益与相位测量、VSWR/回波损耗、PA 线性化。**G3519 板载但输入网络未焊，已封存**。
 
-> 详细资料（参数/引脚/传递函数/三种工作模式/应用要点）见 [`common/docs/AD8302_Use_Mothball.md`](../../../common/docs/AD8302_Use_Mothball.md)。
+> 详细资料（参数/引脚/传递函数/三种工作模式/应用要点）见 [`common/docs/AD8302_Use_Mothball.md`](../../common/docs/AD8302_Use_Mothball.md)。
 
 ---
 

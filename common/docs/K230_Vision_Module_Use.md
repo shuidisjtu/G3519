@@ -183,7 +183,7 @@ Row 7:  F:0123 E:0000               ← 帧/错帧计数 (WHITE)
 ## 6. 调试排查清单
 
 1. **K230 独立自检**：GUI 打开任一识别案例，USB-TTL 接 K230 载板串口 TX/GND，PC 端 115200 应看到 `$..,..#` 帧；若 GUI 已被覆盖/刷机，用 `k230_scripts/k230_link_test.py`（CanMV IDE 临时运行，模拟颜色帧，不依赖亚博库）。
-2. **G3519 独立自检**：UART6 配好后先做 PC10↔PC11 短接回环（参考 `M0G3519_UART_Use.md` §9.2）。
+2. **G3519 独立自检**：UART6 配好后先做 PC10↔PC11 短接回环（参考 `MSPM0G3519_UART_Use.md` §9.2）。
 3. **互连无数据**：检查交叉接线、共地、K230 脚本是否已「保存为 main.py」（脱机运行时）。
 4. **数据乱码**：核对双方波特率；确认 UART6 时钟源为 BUSCLK 且 SysConfig 生成的实例频率宏与实际一致。
 5. **丢帧/错帧**：确认已使能 RX 中断；检查环形缓冲是否溢出（上报频率 × 帧长 vs 主循环消费速度）。
@@ -219,5 +219,5 @@ Row 7:  F:0123 E:0000               ← 帧/错帧计数 (WHITE)
 - [K230 CanMV UART API 手册（v1.7 中文）](https://www.kendryte.com/k230_canmv/zh/v1.7/api/machine/K230_CanMV_UART%E6%A8%A1%E5%9D%97API%E6%89%8B%E5%86%8C.html)
 - [CanMV K230 连接 IDE（v1.7）](https://www.kendryte.com/k230_canmv/zh/v1.7/userguide/how_to_use_ide.html)
 - [亚博 K230 资料页](https://www.yahboom.com/study/K230)
-- 本仓库：`docs/M0G3519_UART_Use.md`、`docs/G3519_main_board.md` §4.1
+- 本仓库：`MSPM0G3519_UART_Use.md`、`G3519_main_board.md` §4.1
 - 本目录 `k230_firmware_ref/`：`YbUart.py`（串口封装）、`YbProtocol.py`（协议全量定义）、`uart.py`（GUI 测试页，仅界面壳）——取自模块 SD 卡固件
