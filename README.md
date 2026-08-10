@@ -1,6 +1,6 @@
 # MSPM0G3519 信号题专用平台
 
-从 [G3519](../G3519) 综合平台拆分，专注 NUEDC-2026 电赛**信号题**开发。主控 TI MSPM0G3519SPZR（Arm Cortex-M0+, 80MHz），IAR EWARM + DAPLink (CMSIS-DAP)。
+为 [G3519 统一仓库](https://github.com/shuidisjtu/G3519) 的 **signal 分支**（控制题对应 control 分支），专注 NUEDC-2026 电赛**信号题**开发。主控 TI MSPM0G3519SPZR（Arm Cortex-M0+, 80MHz），IAR EWARM + DAPLink (CMSIS-DAP)。
 
 ## 功能概览
 
