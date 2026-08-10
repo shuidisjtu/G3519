@@ -18,7 +18,7 @@
 
 | Pin | 功能 | Pin | 功能 |
 |-----|------|-----|------|
-| 1 | COMP (退耦) | 6 | SDATA (← PC3) |
+| 1 | COMP（退耦） | 6 | SDATA (← PC3) |
 | 2 | VDD (3.3V) | 7 | SCLK (← PC2) |
 | 3 | CAP/2.5V (LDO) | 8 | FSYNC (← PC24) |
 | 4 | DGND | 9 | AGND |
@@ -26,7 +26,7 @@
 
 ### J9 跳线帽（关键）
 
-```
+```text
 J9-1 (PC3=SDATA)  ──[跳线帽]──  J9-2 (AD9833 Pin 6)
 J9-3 (PC2=SCLK)   ──[跳线帽]──  J9-4 (AD9833 Pin 7)
 J9-5 (PC24=FSYNC) ──[跳线帽]──  J9-6 (AD9833 Pin 8)
@@ -50,7 +50,7 @@ J9-8 — GND
 
 ### LCD 显示布局
 
-```
+```text
 Row 0: AD9833 DDS Generator  [YELLOW/BLUE]
 Row 2: Wave: Square          [CYAN]     ← 当前波形
 Row 3: Freq:    1000 Hz      [WHITE]    ← 当前频率
@@ -67,9 +67,9 @@ Row 7: PUSH to exit          [GRAY]
 
 | 波形 | 控制字 | 输出路径 | 实测 Vout | 频率 |
 |------|--------|---------|-----------|------|
-| **Square** | `0x2028` | DAC MSB (OPBITEN=1, DIV2=1) | ~3.1V (轨到轨) | = FREQ0 |
-| **Sine** | `0x2000` | DAC 模拟 (OPBITEN=0, MODE=0) | ~0.6Vpp (典型) | = FREQ0 |
-| **Triangle** | `0x2002` | DAC 模拟 (OPBITEN=0, MODE=1) | ~0.6Vpp (典型) | = FREQ0 |
+| **Square** | `0x2028` | DAC MSB (OPBITEN=1, DIV2=1) | ~3.1V（轨到轨） | = FREQ0 |
+| **Sine** | `0x2000` | DAC 模拟 (OPBITEN=0, MODE=0) | ~0.6Vpp（典型） | = FREQ0 |
+| **Triangle** | `0x2002` | DAC 模拟 (OPBITEN=0, MODE=1) | ~0.6Vpp（典型） | = FREQ0 |
 
 > 方波幅度为实测值（2026-07-21, AD2 @ J22）。频率通过编码器在 100 Hz ~ 50 kHz 范围内调节。
 
@@ -161,7 +161,7 @@ GPIO3.associatedPins[6].assignedPin = "24";
 
 ### 6.1 示波器测 VOUT（日常验证）
 
-```
+```text
 AD2 1+ → J22-1（信号）
 AD2 1- → J22-2（GND）
 ```
@@ -174,7 +174,7 @@ AD2 1- → J22-2（GND）
 
 ### 6.2 示波器测 MCLK（时钟验证）
 
-```
+```text
 AD2 1+ → AD9833 Pin 5（或 X1 Pin 3）
 AD2 1- → GND
 ```
@@ -183,7 +183,7 @@ AD2 1- → GND
 
 ### 6.3 逻辑分析仪测 SPI（通信验证，高级）
 
-```
+```text
 AD2 D0 → FSYNC (Pin 8 或 J9-6)
 AD2 D1 → SCLK  (Pin 7 或 J9-4)
 AD2 D2 → SDATA (Pin 6 或 J9-2)
@@ -197,7 +197,7 @@ Logic 模式，FSYNC↓ 触发，单次捕获。预期 4 帧，每帧 16 bit MSB
 | 1 | 0x2100 | RESET |
 | 2 | 0x69F1 | FREQ0 LSB |
 | 3 | 0x4000 | FREQ0 MSB |
-| 4 | 0x2028 | Square (或 0x2000/0x2002) |
+| 4 | 0x2028 | Square（或 0x2000/0x2002） |
 
 ---
 
@@ -206,7 +206,7 @@ Logic 模式，FSYNC↓ 触发，单次捕获。预期 4 帧，每帧 16 bit MSB
 | 症状 | 最可能原因 | 验证方法 |
 |------|-----------|---------|
 | 无任何波形 | J9 缺少跳线帽 | 万用表蜂鸣档测 J9 1-2/3-4/5-6 |
-| 无任何波形 (J9 已通) | MCLK 缺失 | AD2 示波器测 Pin 5 有无 25MHz |
+| 无任何波形（J9 已通） | MCLK 缺失 | AD2 示波器测 Pin 5 有无 25MHz |
 | 频率不对 | 频率字计算错误或 DIV2 位设置错误 | 查 §4.2 频率表，确认 DIV2 与波形匹配 |
 | J12 无波形但 J22 有 | J12 同轴座或走线断路 | 使用 J22 替代 |
 | 正弦/三角幅度异常 | DAC 模拟输出路径受负载影响 | 直接量 Pin 10 确认 |
@@ -215,5 +215,5 @@ Logic 模式，FSYNC↓ 触发，单次捕获。预期 4 帧，每帧 16 bit MSB
 
 ## 8. 已知限制
 
-- **与 CCD 引脚冲突**：PC2/PC3 同时被 AD9833 (GPIO 输出) 和 CCD (ADC 输入) 使用。禁止同时使能两者
+- **与 CCD 引脚冲突**：PC2/PC3 同时被 AD9833（GPIO 输出） 和 CCD（ADC 输入） 使用。禁止同时使能两者
 - **GPIO 位脉冲速率**：DL_GPIO 函数调用开销使 SCLK 频率自然较低（~2-4MHz），远低于 AD9833 40MHz 上限，暂不影响功能

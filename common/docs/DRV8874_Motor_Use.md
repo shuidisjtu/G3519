@@ -92,7 +92,7 @@ SLEEP_LOW();                                 // 禁用 H 桥
 
 EDGE_ALIGN 模式下计数器从 LOAD(=3998) 倒数，LACT=CCP_HIGH（LOAD 时输出高），CDACT=CCP_LOW（匹配时输出低）。
 
-```
+```text
 CC 值越大 → 匹配越早 → 高电平越短 → duty 越低
 duty_to_cc(duty_pct) = LOAD - (duty_pct * LOAD / 100)
 
