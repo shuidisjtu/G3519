@@ -401,85 +401,11 @@ tsp_pga_set_gain(20);     // 设置目标增益 ×10 单位 (20 = 2.0x)
 
 ## 三、检测与测量
 
-### 3.1 AD8302 — LF~2.7 GHz 增益/相位检测器
+### 3.1 AD8302 — LF~2.7 GHz 增益/相位检测器（封存）
 
-**制造商**：Analog Devices
-**核心用途**：RF/IF 增益与相位同时测量、VSWR/回波损耗、PA 线性化
-**特点**：一片同时输出幅度比 (VMAG) + 相位差 (VPHS)
+一片同时输出幅度比 (VMAG) + 相位差 (VPHS)，用于 RF/IF 增益与相位测量、VSWR/回波损耗、PA 线性化。**G3519 板载但输入网络未焊，已封存**。
 
-#### 主要参数
-
-| 参数 | 规格 |
-|------|------|
-| 频率范围 | LF ~ 2.7 GHz |
-| 输入动态范围 | -60 ~ 0 dBm (50Ω) |
-| 增益测量范围 | ±30 dB，30 mV/dB |
-| 相位测量范围 | 0~180°（中心 90°），10 mV/° |
-| 增益非线性度 | < 0.5 dB |
-| 相位非线性度 | < 1° |
-| 供电 | 2.7~5.5V 单电源 |
-| 基准输出 VREF | 1.8V |
-| 静态电流 | 19 mA @ 5V |
-
-#### 引脚定义 (14-TSSOP)
-
-| 引脚 | 名称 | 功能 |
-|------|------|------|
-| 1, 7 | COMM | 公共地 |
-| 2 | INPA | A 通道输入 |
-| 3 | OFSA | A 通道偏移补偿 |
-| 4 | VPOS | 电源 |
-| 5 | OFSB | B 通道偏移补偿 |
-| 6 | INPB | B 通道输入 |
-| 8 | PFLT | 相位输出低通滤波 |
-| 9 | VPHS | 相位差输出 |
-| 10 | PSET | 相位设定点（测量模式接 VPHS） |
-| 11 | VREF | 1.8V 基准 |
-| 12 | MSET | 增益设定点（测量模式接 VMAG） |
-| 13 | VMAG | 增益输出 |
-| 14 | MFLT | 幅度输出低通滤波 |
-
-#### 传递函数
-
-```
-VMAG = 0.9V ± 30 mV/dB × Gain_dB
-VPHS = 0.9V ± 10 mV/° × (Phase - 90°)
-```
-
-| 幅度差 | VMAG | 相位差 | VPHS |
-|--------|------|--------|------|
-| 0 dB | 0.9V | 90° | 0.9V |
-| +30 dB | 1.8V | 180° | 1.8V |
-| -30 dB | 0V | 0° | 0V |
-
-#### 内部架构
-
-```
-INPA → [60dB 对数放大器 A] ──┬──→ [减法器 A-B] → VMAG (30mV/dB)
-INPB → [60dB 对数放大器 B] ──┘
-                              ├──→ [限幅器] → [相位检波器] → VPHS (10mV/°)
-```
-
-#### 三种工作模式
-
-| 模式 | 接法 | 用途 |
-|------|------|------|
-| 测量模式 | VMAG→MSET, VPHS→PSET | 直接读出增益/相位 |
-| 控制器模式 | MSET/PSET 加设定电压 | AGC/自动相位控制 |
-| 比较器模式 | MSET/PSET 加阈值 | 报警检测 |
-
-#### 应用要点
-
-- INPA/INPB 需交流耦合（串 0.1μF），内部 500Ω 终端
-- OFSA/OFSB 各接 1nF 到地
-- MFLT/PFLT 接电容到地限制噪声带宽
-- PCB 布局：RF 输入走 50Ω 微带线
-
-#### 参考资源
-
-- [产品页](https://www.analog.com/en/products/ad8302.html) · [Datasheet PDF](https://www.analog.com/media/en/technical-documentation/data-sheets/ad8302.pdf)
-- [评估板 EVAL-AD8302](https://www.analog.com/en/resources/evaluation-hardware-and-software/evaluation-boards-kits/eval-ad8302.html)
-- [EVAL-AD8302-ARDZ Wiki](https://wiki.analog.com/resources/eval/user-guides/eval-ad8302-ardz)
+> 详细资料（参数/引脚/传递函数/三种工作模式/应用要点）见 [`common/docs/AD8302_Use_Mothball.md`](../../../common/docs/AD8302_Use_Mothball.md)。
 
 ---
 
