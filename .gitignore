@@ -53,3 +53,7 @@ empty_mspm0g3519/01_k230_color_detect/
 *.swp
 *.swo
 *~
+
+# === Local Dev Artifacts (not synced) ===
+# 本地开发流程产物(specs/plans), 不同步到 GitHub
+/docs/superpowers/
