@@ -26,7 +26,6 @@
 - TJC 屏：比赛正式 UI 工程（根据实际题目搭建）
 
 [AD5933_Use.md]: ../development_reference/AD5933_Use.md
-[Debug_Report.md]: ../development_reference/AD5933_Debug_Report.md
 [AD9833_DDS_Use.md]: ../development_reference/AD9833_DDS_Use.md
 [AD8302_Use_Mothball.md]: ../development_reference/AD8302_Use_Mothball.md
 [M0G3519_UART_Use.md]: ../development_reference/M0G3519_UART_Use.md
