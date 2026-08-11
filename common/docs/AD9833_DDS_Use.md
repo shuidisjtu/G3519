@@ -1,7 +1,7 @@
 # AD9833 DDS 波形发生器使用说明
 
 > 编写日期：2026-07-21
-> 状态：✅ 已验证（J9 跳线帽已补齐，方波/正弦/三角波均正常工作）
+> 状态：✅ 已验证（J9 跳线帽已补齐，方波/正弦/三角波均正常工作）；**模块已封存**——与 CCD 共用 PC2/PC3，二者禁止同时使能（见 §8 已知限制）。当前仅 signal 题使用（DDS Test / Sweep 激励源）
 
 ## 1. 硬件概览
 
@@ -136,14 +136,14 @@ DDS_WAVE_COUNT           // 3
 | `NUEDC2025/tsp_dds.c` | `tsp_dds_write()`、`tsp_dds_set_output()`、`tsp_dds_stop()`、`tsp_dds_get_step()`、波形元数据 |
 | `NUEDC2025/tsp_dds.h` | AD9833 常量、API 原型 |
 | `TSP3519/tsp_gpio.h` | DDS GPIO 宏（`DDS_SCLK_HIGH/LOW` 等） |
-| `iar/empty_mspm0g3519.c` | `action_dds_test()` 交互测试（调用 tsp_dds API） |
-| `iar/empty_mspm0g3519.syscfg` | SysConfig 引脚配置（PC2/PC3/PC24 为 GPIO 输出） |
+| `signal/iar/empty_mspm0g3519.c` | `action_dds_test()` 交互测试（调用 tsp_dds API） |
+| `signal/iar/empty_mspm0g3519.syscfg` | SysConfig 引脚配置（PC2/PC3/PC24 为 GPIO 输出） |
 
 ---
 
 ## 5. SysConfig 配置
 
-```javascript
+```ini
 // PC2/PC3/PC24 作为 GPIO 输出（MODE=1, PF=0x01），不绑定 I2C2 外设
 GPIO3.associatedPins[4].$name       = "DDS_SCLK";   // PC2
 GPIO3.associatedPins[4].assignedPin = "2";
@@ -215,5 +215,5 @@ Logic 模式，FSYNC↓ 触发，单次捕获。预期 4 帧，每帧 16 bit MSB
 
 ## 8. 已知限制
 
-- **与 CCD 引脚冲突**：PC2/PC3 同时被 AD9833（GPIO 输出） 和 CCD（ADC 输入） 使用。禁止同时使能两者
+- **与 CCD 引脚冲突**：PC2/PC3 同时被 AD9833（GPIO 输出）和 CCD（ADC 输入）使用。禁止同时使能两者
 - **GPIO 位脉冲速率**：DL_GPIO 函数调用开销使 SCLK 频率自然较低（~2-4MHz），远低于 AD9833 40MHz 上限，暂不影响功能

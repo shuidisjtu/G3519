@@ -57,7 +57,7 @@ CCD2 测试时改接 J17：SI=PC4, CLK=PC5, AO=PB17，AD2 接线相应调整。
 | A2 | flush CLK 脉冲数 | 恰好 128 个 | 用 WaveForms 计数器测 CLK 脉冲数 |
 | A3 | 曝光间隔 | SI 落后于 flush 最后 CLK↓ 约 10ms | 测量 flush 结束 → 读出 SI↑ 的时间间隔 |
 | A4 | 读出起始脉冲 | 与 flush 起始脉冲模式相同 | SI↑→CLK↑→SI↓→CLK↓ |
-| A5 | 读出 CLK 脉冲数 | 128 + 1（第 129 个终止脉冲） = 129 个 | 计数从读出 SI↑ 之后的 CLK 脉冲 |
+| A5 | 读出 CLK 脉冲数 | 128 + 1（第 129 个终止脉冲）= 129 个 | 计数从读出 SI↑ 之后的 CLK 脉冲 |
 | A6 | CLK 脉宽 | 高电平 ~3us, 低电平 ~3us（来自 delay loop） | 测量单个 CLK 脉冲 |
 | A7 | CLK 抖动 | 读出期间个别 CLK 周期可能偏长（SysTick 中断） | 测量 CLK 周期标准差，确认无异常长周期 |
 

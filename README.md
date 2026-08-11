@@ -10,7 +10,7 @@ G3519/
 │   ├── TSP3519/     ← 板级支持库：gpio/lcd/ccd/menu
 │   ├── NUEDC2025/   ← 基础驱动：isr/key/encoder/uart/uart_k230
 │   ├── drivers/     ← 通用外设驱动：motor/mpu6050/pid/ad5933/dds/adc/uart3
-│   └── docs/        ← 共享文档（3519_hardware 硬件手册、主板资料、外设用法）
+│   └── docs/        ← 共享文档（3519_hardware 硬件手册、主板资料、外设用法、datasheets/ 手册库）
 ├── control/         ← 控制题应用：IAR 工程 + app（循迹/里程计/K230/轮编码器）+ 特有文档
 └── signal/          ← 信号题应用：IAR 工程 + app（FFT/示波器/TJC 屏/命令协议）+ 特有文档
 ```
@@ -60,5 +60,8 @@ G3519/
 
 - 硬件手册/电路图/管脚图：`common/docs/3519_hardware/`
 - 各外设用法：`common/docs/*.md`
+- 芯片官方手册库（mcu/peripherals/instruments，约 40 MB）：`common/docs/datasheets/`，索引见 `common/docs/README.md`
+- K230 固件参考（YbProtocol）：`common/docs/k230_firmware_ref/`
 - 控制题/信号题比赛记录：`control/docs/`、`signal/docs/`
+- 2026 G 题官方赛题原文与模拟前端设计存档：`signal/docs/2026_G_Official_Topic.md`、`signal/docs/2026_Analog_Frontend_Design.md`
 - [TI MSPM0 SDK 文档](https://www.ti.com/tool/MSPM0-SDK)

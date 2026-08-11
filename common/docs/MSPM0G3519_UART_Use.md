@@ -213,7 +213,7 @@ RX 中断触发
 | 波特率分频 | IBRD=2, FBRD=11（由 SDK 自动计算） |
 | PC 端 | DAPLink 虚拟串口 (COM11) |
 
-> ⚠️ **已知问题（2026-07-19）**：UART0 在不接 DAPLink 时 TX 阻塞（NRST=2.5V 临界电压导致 MFCLK 时钟不稳定，`DL_UART_transmitDataBlocking()` 永久等待）。当前固件已从 `main()` 移除 `tsp_uart_init()`，printf/UART0 调试输出仅在接 DAPLink 时可用。详见 `README.md` 已知问题。
+> **历史问题（2026-07-19，已修复）**：UART0 在不接 DAPLink 时 TX 阻塞（NRST=2.5V 临界电压导致 MFCLK 时钟不稳定，`DL_UART_transmitDataBlocking()` 永久等待）。修复：`tsp_uart_*` 全部改为 10ms 超时 TX（2026-07-26 起），脱机不再阻塞。**当前 signal 工程 `main()` 已直接调用 `tsp_uart_init(115200)`**（`signal/iar/empty_mspm0g3519.c`），printf/UART0 调试输出正常可用；control 工程未调用 `tsp_uart_init()`，如需 UART0 调试需自行在 `main()` 添加。
 
 UART6（K230 视觉模块通道，2026-07-17 实测验证，详见 `K230_Vision_Module_Use.md`）：
 
@@ -226,7 +226,7 @@ UART6（K230 视觉模块通道，2026-07-17 实测验证，详见 `K230_Vision_
 
 ### 关键注意事项
 
-1. **UART0 在 PD0 域**，最大输入时钟 40 MHz。不可直接用 BUSCLK (80 MHz) 作为时钟源。
+1. **UART0 在 PD0 域**，最大输入时钟 40 MHz（详见 §5.1）。不可直接用 BUSCLK (80 MHz) 作为时钟源。
 2. **SysConfig 管理时钟和引脚**：应在 `.syscfg` 中添加 UART 模块并选用 MFCLK，手动配置会引入难以排查的错误。
 3. **RX 中断按需开启**：`tsp_uart_init()` 不启用 RX 中断，需调用 `tsp_uart_rx_enable()` 后才接收。防止浮空引脚产生中断风暴。
 4. **波特率调整**：SysConfig 预设 9600，应用层通过 `DL_UART_configBaudRate(uart, 4000000, 115200)` 覆盖。
@@ -240,7 +240,7 @@ UART6（K230 视觉模块通道，2026-07-17 实测验证，详见 `K230_Vision_
 1. 连接 DAPLink 到主板 J1（红边对准 RST/1 脚）
 2. PC 端打开 SSCOM，选择 DAPLink 虚拟串口（如 COM11），115200-8N1
 3. 烧录并运行程序，开机后应收到 `MSPM0G3519 booted`
-4. ⚠️ 当前固件已移除 UART0 初始化（脱机阻塞问题），上述自检需临时在 `main()` 中恢复 `tsp_uart_init(115200)` 和 `tsp_uart_send_string()` 调用
+4. signal 工程 `main()` 已包含 `tsp_uart_init(115200)`（带超时保护），烧录后直接可收到启动信息；control 工程若未初始化 UART0，需在 `main()` 中添加 `tsp_uart_init(115200)` 调用
 
 ### 9.2 回环测试（硬件验证）
 

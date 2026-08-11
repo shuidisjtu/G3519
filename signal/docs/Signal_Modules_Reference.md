@@ -37,7 +37,7 @@
 
 | 参数 | 规格 |
 |------|------|
-| 主时钟 MCLK | 75 MHz（C 级） / 50 MHz（B 级） |
+| 主时钟 MCLK | 75 MHz（C 级）/ 50 MHz（B 级） |
 | 最大输出频率 | 37.5 MHz (@ 75 MHz MCLK) |
 | DAC 分辨率 | 10 位 |
 | 频率字宽度 | 28 位 |
@@ -653,3 +653,5 @@ W = (X1 - X2)(Y1 - Y2) / 10V + Z
 ---
 
 *合并自 `电子模块清单.md` + `器件汇总.md`。链接整理时间 2026-07-28，部分第三方链接可能失效，以芯片型号在 ADI / TI / Renesas / 立创官网检索为准。*
+
+*PS：已有的电源小模块：MORNSUN WRA0512S-1WR2（隔离电源，手册见 `common/docs/datasheets/peripherals/WRA_S-1WR2.pdf`）。*

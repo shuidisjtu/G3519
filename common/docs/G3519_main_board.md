@@ -109,12 +109,14 @@
 
 | LCD 信号 | MCU 外设功能 | MCU GPIO | 物理脚号 |
 |---|---|---:|---:|
-| LCD_CS | SPI1-CS0 | PB6 | 40 |
-| LCD_D/C | SPI1-MISO 复用作 GPIO | PB7 | 41 |
-| LCD_SOUT | SPI1-MOSI | PB8 | 42 |
-| LCD_SCK | SPI1-SCK | PB9 | 43 |
+| LCD_CS | GPIO（软件片选） | PB28 | 29 |
+| LCD_D/C | GPIO（数据/命令） | PB29 | 30 |
+| LCD_SOUT | SPI1-PICO | PB30 | 31 |
+| LCD_SCK | SPI1-SCLK | PB31 | 32 |
 | LCD_RST | GPIO | PA8 | 27 |
 | LCD_BL | GPIO | PA9 | 28 |
+
+> 引脚以 SysConfig 生成的实际固件配置为准（`ti_msp_dl_config.h`：LCD_CS=GPIOB.28/PINCM65、LCD_DC=GPIOB.29/PINCM66、PICO=GPIOB.30/PINCM67、SCLK=GPIOB.31/PINCM68、POCI=GPIOB.14/PINCM31；PB30/PB31 物理脚号按 PINCM 连续性推断）。原理图区域曾标注 SPI1 复用 PB6-PB9，与编码器 1（PB7/PB9，TIMG9 QEI）重叠；实际固件 LCD 使用 PB28-PB31，不占用该组引脚，**LCD 与编码器 1 无资源冲突**（2026-08-11 经 SysConfig 确认）。
 
 LCD 接口通过 40Pin 板间连接器送往扩展板，扩展板上由 S8050 三极管控制背光。
 
@@ -215,7 +217,7 @@ Vsense ≈ VBAT × 24.9 / (100 + 24.9) ≈ VBAT / 5.02
 | S1 | GPIO | PC0 | 56 | 40 |
 | S2 | GPIO | PA16 | 55 | 39 |
 
-> **复用风险提示：**图中功能映射将 PHA1/PHB1 分别标为 TIMG9-C1/TIMG9-C0，而 LCD_SCK/LCD_D/C 又使用 PB9/PB7 的 SPI1 功能。按该映射，两组功能落在相同 GPIO 的不同复用功能上，不能同时作为两个独立 MCU 管脚使用。备赛时应重点核对 PCB 网表、示例工程和实板通断；若确实共用，则 LCD 与编码器 1 需要在软件和使用场景上互斥。
+> **复用风险提示（已解决）：**图中 PHA1/PHB1 标注为 TIMG9-C1/TIMG9-C0（PB9/PB7），旧版 LCD 表曾将其标为 SPI1 复用。经 SysConfig 确认（`ti_msp_dl_config.h`），LCD 实际使用 PB28-PB31/PB14，与编码器 1（PB7/PB9）不重叠，**两模块可同时使用，无需互斥**（2026-08-11 勘正）。
 
 ---
 
@@ -335,5 +337,5 @@ Vsense ≈ VBAT × 24.9 / (100 + 24.9) ≈ VBAT / 5.02
 3. SWD 下载失败时优先检查 RST、SWDIO、SWCLK、3.3 V 和 GND。
 4. ADC 输入不得超过 MCU ADC 允许范围；VIN1～VIN5 没有大比例分压。
 5. DDS、VNA、AD8302 属于模拟敏感电路，测量时使用短地线、同轴线和单点接地。
-6. 对 LCD 与编码器 1 的潜在管脚复用冲突进行实板通断和固件验证。
+6. LCD 与编码器 1 的引脚复用冲突已由 SysConfig 确认不存在（LCD=PB28-PB31/PB14，编码器 1=PB7/PB9）；如需复核，对比 `ti_msp_dl_config.h` 与实板通断即可。
 7. 板间连接器含多路电源脚，严禁带电错位插拔。

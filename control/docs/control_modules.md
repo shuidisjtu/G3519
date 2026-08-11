@@ -32,7 +32,7 @@
   - 死区补偿: MOTOR_DEAD_ZONE=50, MOTOR_DC_LIMIT=99
 - **验证状态**（2026-07-26）：双轮同步起转、方向正确、开环速度基本对称
 - **使用注意**：调用 `tsp_motor_set()` 前必须先 `SLEEP_HIGH()` 使能 H 桥
-- **参考文档**：`common/docs/DRV8874_Motor_Use.md`
+- **参考文档**：`../../common/docs/DRV8874_Motor_Use.md`
 - **参考工程**：[HSPv2](https://github.com/yyx1248722477/hsp.git) — 同底盘/扩展板
 
 #### 双 PWM 迁移（2026-07-26）
@@ -49,8 +49,8 @@
   - 色块识别坐标映射（K230 640×480 → LCD 160×80）
   - 指令协议（`$SWITCH#` 切换识别模式）
 - **坐标映射**：`lcd_x = tgt.x/4, lcd_y = 16 + tgt.y/6`
-- **参考文档**：`common/docs/K230_Vision_Module_Use.md`
-- **K230 固件**：`k230_firmware_ref/` 目录（亚博 SD 卡固件归档）
+- **参考文档**：`../../common/docs/K230_Vision_Module_Use.md`
+- **K230 固件**：`../../common/docs/k230_firmware_ref/` 目录（亚博 SD 卡固件归档）
 
 ### CCD 线阵（循迹）
 
@@ -69,7 +69,7 @@
 - **AD2 验证（2026-07-25）**：DC 1.65V 注入 CCD1(PB18)，Avg=2266（理论 2048，偏差 ~10%，正常）
 - **LCD 波形显示**：采用批量清空+连线绘制（`set_region` 流式写入清屏，再画相邻列垂直线段）。动态波形（AD2 正弦/三角）显示效果一般，但实际 CCD 空间信号（黑白线条）相邻像素平滑，预计效果良好
 - **引脚互斥**：与 AD9833 DDS 共用 PC2/PC3，小车题中一般不需要 DDS，无冲突
-- **AD2 测试方案**：`common/docs/CCD_AD2_Test.md`
+- **AD2 测试方案**：`../../common/docs/CCD_AD2_Test.md`
 
 ### 旋钮编码器（参数微调）
 
@@ -111,7 +111,7 @@
   - Gyro Z 校准偏移正常工作（200 采样平均 + 死区滤波）
   - Yaw 积分显示正常（整数度，无字段重叠）
   - I2C 总线空闲保护后错误计数稳定为 0
-- **参考**：`common/docs/G3519_main_board.md` §8.1
+- **参考**：`../../common/docs/G3519_main_board.md` §8.1
 
 ## 引脚互斥关系（小车题相关）
 

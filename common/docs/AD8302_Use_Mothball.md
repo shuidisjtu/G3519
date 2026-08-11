@@ -101,15 +101,37 @@ phase_deg = (1800.0f - vphs_mv) / 10.0f;  // 0°→1.8V, 90°→0.9V, 180°→0V
 
 ## 3. 输入注意事项
 
-- INPA/INPB 必须**交流耦合**，阻抗/终端匹配，且同时处于有效输入范围内（约 −60 至 0 dBm @ 50Ω）
+- INPA/INPB 必须**交流耦合**（串 0.1μF），内部 **500Ω** 终端匹配，且同时处于有效输入范围内（约 −60 至 0 dBm @ 50Ω）
+- OFSA/OFSB 各接 **1nF** 到地（偏移补偿）
 - **输入悬空不是受保证的工作状态**——不能据此设计 pass/fail 判断
 - VMAG/VPHS 输出带宽由 MFLT/PFLT 电容（0.1µF）决定，适合准静态显示
+- PCB 布局：RF 输入走 **50Ω 微带线**
+
+### 3.1 三种工作模式
+
+| 模式 | 接法 | 用途 |
+|------|------|------|
+| 测量模式 | VMAG→MSET、VPHS→PSET | 直接读出增益/相位（本板 §1.4 即此接法） |
+| 控制器模式 | MSET/PSET 加设定电压 | AGC/自动相位控制 |
+| 比较器模式 | MSET/PSET 加阈值 | 报警检测 |
+
+### 3.2 关键参数速查
+
+| 参数 | 规格 |
+|------|------|
+| 增益测量范围 | ±30 dB，30 mV/dB |
+| 增益非线性度 | < 0.5 dB |
+| 相位测量范围 | 0~180°（中心 90°），10 mV/° |
+| 相位非线性度 | < 1° |
+| 供电 | 2.7~5.5V 单电源 |
+| 基准输出 VREF | 1.8V |
+| 静态电流 | 19 mA @ 5V |
 
 ---
 
 ## 4. 审查发现的阻断问题（2026-07-22）
 
-原实施计划 `docs/superpowers/plans/2026-07-22-AD8302-implementation.md` 存在 4 项阻断问题，**必须修正后才能实施**。
+原实施计划（2026-07-22 审查稿，未随仓库分发）存在 4 项阻断问题，**必须修正后才能实施**。
 
 | # | 问题 | 详细 | 修正方案 |
 |---|------|------|---------|
@@ -180,5 +202,7 @@ float tsp_ad8302_phase_deg(void) {
 
 - Analog Devices, [AD8302 Datasheet](https://www.analog.com/media/en/technical-documentation/data-sheets/ad8302.pdf)
 - Analog Devices, [Accurate Gain/Phase Measurement at Radio Frequencies](https://www.analog.com/en/resources/analog-dialogue/articles/accurate-gain-phase-measurement-up-to-2-5-ghz.html)
+- Analog Devices, [EVAL-AD8302 评估板](https://www.analog.com/en/resources/evaluation-hardware-and-software/evaluation-boards-kits/eval-ad8302.html)
+- Analog Devices, [EVAL-AD8302-ARDZ Wiki](https://wiki.analog.com/resources/eval/user-guides/eval-ad8302-ardz)
 - Texas Instruments, [MSPM0G3519 Datasheet](https://www.ti.com/lit/ds/symlink/mspm0g3519.pdf)
-- 审查报告：`F:\Test\AD8302_实施计划审查报告.md`（2026-07-22）
+- 审查报告：2026-07-22 审查稿（本机路径 `F:\Test\AD8302_实施计划审查报告.md`，仓库外不随库分发；结论已内嵌于本文 §4/§5）

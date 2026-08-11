@@ -18,7 +18,7 @@ G3519/
 ├── common/TSP3519/     ← 板级支持库(gpio/lcd/ccd/menu/头文件枢纽)
 ├── common/NUEDC2025/   ← 基础驱动(isr/key/encoder/uart/uart_k230)
 ├── common/drivers/     ← 通用外设驱动(motor/mpu6050/pid/ad5933/dds/adc/uart3)
-├── common/docs/        ← 共享文档(3519_hardware 硬件手册/主板资料)
+├── common/docs/        ← 共享文档(3519_hardware 硬件手册/主板资料/datasheets 手册库/k230_firmware_ref)
 ├── control/            ← 控制题: iar 工程 + app(循迹/里程计/K230/轮编码器)+ docs
 └── signal/             ← 信号题: iar 工程 + app(FFT/示波器/TJC/cmd)+ docs
 ```
